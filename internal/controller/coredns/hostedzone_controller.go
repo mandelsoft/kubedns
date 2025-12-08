@@ -50,7 +50,6 @@ func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	_ = logf.FromContext(ctx)
 
 	// TODO(user): your logic here
-
 	return ctrl.Result{}, nil
 }
 

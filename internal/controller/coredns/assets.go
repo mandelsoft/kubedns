@@ -12,16 +12,18 @@ import (
 //go:embed assets
 var content embed.FS
 
+const manifestsDir = "assets/manifests"
+
 func GetManifests() (map[string][]byte, error) {
 	manifests := make(map[string][]byte)
-	entries, err := fs.ReadDir(content, "assets")
+	entries, err := fs.ReadDir(content, manifestsDir)
 	if err != nil {
 		return nil, err
 	}
 	for _, e := range entries {
 		if !e.IsDir() {
 			if strings.HasSuffix(e.Name(), ".yaml") || strings.HasSuffix(e.Name(), ".yml") {
-				data, err := content.ReadFile("assets/"+e.Name())
+				data, err := content.ReadFile(manifestsDir+"/"+e.Name())
 				if err != nil {
 					return nil, err
 				}
