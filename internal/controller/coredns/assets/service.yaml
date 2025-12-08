@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: (( values.service.name ))
+  labels:
+    target: runtime
+    app: (( values.deployment.label ))
+spec:
+  # Use ClusterIP for internal DNS resolution within the cluster
+  type: ClusterIP
+
+  # Selects the pods created by the Deployment
+  selector:
+    app: (( values.deployment.label ))
+
+  ports:
+    - name: dns-udp-port
+      protocol: UDP
+      port: 53          # The port the Service exposes
+      targetPort: 53    # The containerPort defined in the Deployment

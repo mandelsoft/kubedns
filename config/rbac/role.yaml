@@ -1,0 +1,32 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - coredns.mandelsoft.org
+  resources:
+  - hostedzones
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - coredns.mandelsoft.org
+  resources:
+  - hostedzones/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - coredns.mandelsoft.org
+  resources:
+  - hostedzones/status
+  verbs:
+  - get
+  - patch
+  - update

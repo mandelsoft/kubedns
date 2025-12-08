@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: (( values.deployment.name ))
+  labels:
+    target: runtime
+    app: (( values.deployment.label ))
+spec:
+  replicas: (( values.deployment.replicas ))
+  selector:
+    matchLabels:
+      app: (( values.deployment.label ))
+  template:
+    metadata:
+      labels:
+        app: (( values.deployment.label ))
+    spec:
+      containers:
+        - name: dns-container
+          # Use your actual image here. Using coredns/coredns as an example.
+          image: coredns/coredns:latest
+          imagePullPolicy: IfNotPresent
+
+          # Pass the config file path via the --corefile option
+          args:
+            - -conf
+            - /etc/coredns/Corefile # Path to the mounted config file
+
+          ports:
+            - containerPort: 53
+              name: dns-udp
+              protocol: UDP
+
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/coredns # Mount point for the config file
+              readOnly: true
+
+      volumes:
+        - name: config-volume
+          configMap:
+            name: (( values.configmap.name )) # Must match the ConfigMap name above
+            items:
+              - key: Corefile # Key in the ConfigMap
+                path: Corefile # Filename inside the mountPath

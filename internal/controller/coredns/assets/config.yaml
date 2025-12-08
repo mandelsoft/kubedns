@@ -1,0 +1,10 @@
+kind: ConfigMap
+metadata:
+  name: (( values.configmap.name ))
+  namespace: (( values.runtime.namespace ))
+  labels:
+    target: runtime
+    app: dns-service
+data:
+  # The key name here ('Corefile') will be the filename in the volume mount
+  Corefile: (( values.configmap.corefile ))
