@@ -30,10 +30,20 @@ type HostedZoneSpec struct {
 	// The following markers will use OpenAPI v3 schema to validate the value
 	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 
+	// Class is used separate different hosted zone realms managed by different
+	// controller sets.
+	// It should only be set for root zones (without a parent).
+	// +optional
+	Class string `json:"class,omitempty"`
 
-	Class string `json:"class"`
+	// Runtime is ised to specify the logical runtime to use
+	// for deploying the promary DNS server.
+	// It should only be set for root zones (without a parent).
+	// +optional
+	Runtime string `json:"runtime,omitempty"`
 
-	// DomainName is the name of the domain of the hosted zone.
+	// DomainNames is a set of domain names for the hosted zone.
+	// Formally, for every name a new DNS zone is managed.
 	DomainNames []string `json:"domainNames"`
 
 	// EMail address of admins.

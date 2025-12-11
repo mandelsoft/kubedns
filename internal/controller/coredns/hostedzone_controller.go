@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -29,6 +30,7 @@ import (
 
 // HostedZoneReconciler reconciles a HostedZone object
 type HostedZoneReconciler struct {
+	Clientset *kubernetes.Clientset
 	client.Client
 	Scheme *runtime.Scheme
 }

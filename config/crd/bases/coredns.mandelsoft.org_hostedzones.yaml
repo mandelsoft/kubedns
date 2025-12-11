@@ -82,9 +82,15 @@ spec:
             description: spec defines the desired state of HostedZone
             properties:
               class:
+                description: |-
+                  Class is used separate different hosted zone realms managed by different
+                  controller sets.
+                  It should only be set for root zones (without a parent).
                 type: string
               domainNames:
-                description: DomainName is the name of the domain of the hosted zone.
+                description: |-
+                  DomainNames is a set of domain names for the hosted zone.
+                  Formally, for every name a new DNS zone is managed.
                 items:
                   type: string
                 type: array
@@ -107,8 +113,13 @@ spec:
               retry:
                 description: Retry time to repeat refresh.
                 type: integer
+              runtime:
+                description: |-
+                  Runtime is ised to specify the logical runtime to use
+                  for deploying the promary DNS server.
+                  It should only be set for root zones (without a parent).
+                type: string
             required:
-            - class
             - domainNames
             - email
             - expire

@@ -53,7 +53,7 @@ func extractTokenFromTokenRequest(clientset *kubernetes.Clientset, saName, saNam
 	if !ok {
 		return "", "", fmt.Errorf("secret %s does not contain 'token' key", secretName)
 	}
-	 */
+	*/
 
 	caData, ok := secret.Data["ca.crt"]
 	if !ok {

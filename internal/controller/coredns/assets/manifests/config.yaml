@@ -1,10 +1,24 @@
 kind: ConfigMap
 metadata:
-  name: (( values.configmap.name ))
+  name: (( values.config.name ))
   namespace: (( values.runtime.namespace ))
   labels:
     target: runtime
-    app: dns-service
+    app: (( values.deployment.label ))
 data:
   # The key name here ('Corefile') will be the filename in the volume mount
-  Corefile: (( values.configmap.corefile ))
+  Corefile: |
+    .:53 {
+      errors
+      health
+      ready
+      cache 30
+      kubedyndns . {
+        mode Primary
+        zoneobject (( values.config.zone ))
+        namespaces (( values.dataplane.namespace ))
+        transitive
+        (( (values.runtime.separated || false ) ? "kubeconfig /etc/coredns/KubeConfig default" :"" ))
+        ttl 30
+      }
+    }

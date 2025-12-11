@@ -23,7 +23,7 @@ func GetManifests() (map[string][]byte, error) {
 	for _, e := range entries {
 		if !e.IsDir() {
 			if strings.HasSuffix(e.Name(), ".yaml") || strings.HasSuffix(e.Name(), ".yml") {
-				data, err := content.ReadFile(manifestsDir+"/"+e.Name())
+				data, err := content.ReadFile(manifestsDir + "/" + e.Name())
 				if err != nil {
 					return nil, err
 				}
@@ -33,7 +33,6 @@ func GetManifests() (map[string][]byte, error) {
 	}
 	return manifests, nil
 }
-
 
 func PrintManifests() {
 	manifests, err := GetManifests()
@@ -52,39 +51,28 @@ func RenderManifests() {
 	if err != nil {
 		panic(err)
 	}
-	values:=map[string]interface{}{
+	values := map[string]interface{}{
 		"runtime": map[string]interface{}{
 			"namespace": "dnsservice",
+			//"separated": true,
 		},
 		"dataplane": map[string]interface{}{
 			"namespace": "ns",
+			//"server": "https://localhost:6443",
+			//"token": "some token",
+			//"cadata": "some cert",
 		},
 		"deployment": map[string]interface{}{
 			"name":     "dns-server-ns-hz",
-		    "label": "dns-service-ns-hz",
+			"label":    "dns-service-ns-hz",
 			"replicas": 3,
 		},
 		"service": map[string]interface{}{
-			"name":     "dns-server-svc-ns-hz",
+			"name": "dns-server-svc-ns-hz",
 		},
-		"configmap": map[string]interface{}{
-			"name": "dns-server-cfg-ns-hz",
-			"corefile": `
-.:1053 {
-  errors
-  health
-  ready
-  cache 30
-  kubedyndns . {
-    mode Primary
-    zoneobject hz
-    namespaces ns
-    transitive
-    kubeconfig local/kubeconfig default
-    ttl 30
-  }
-}
-`,
+		"config": map[string]interface{}{
+			"name": "dns-server-ns-hz",
+			"zone": "hz",
 		},
 	}
 
@@ -93,12 +81,12 @@ func RenderManifests() {
 		panic(err)
 	}
 	fmt.Printf("dataplane manifests:\n")
-	for k,v := range dataplane {
+	for k, v := range dataplane {
 		fmt.Printf("- %s:\n", k)
 		fmt.Printf("    %s\n", strings.Replace(string(v), "\n", "\n    ", -1))
 	}
 	fmt.Printf("runtime manifests:\n")
-	for k,v := range runtime {
+	for k, v := range runtime {
 		fmt.Printf("- %s:\n", k)
 		fmt.Printf("    %s\n", strings.Replace(string(v), "\n", "\n    ", -1))
 	}

@@ -1,3 +1,18 @@
+helper:
+  <<<: (( &temporary ))
+  secret:
+    mount:
+      name: secret-volume
+      mountPath: /etc/coredns # Mount point for the config file
+      readOnly: true
+    volume:
+      - name: secret-volume
+        secret:
+          secretName: (( values.config.name )) # Must match the ConfigMap name above
+          items:
+            - key: KubeConfig # Key in the ConfigMap
+              path: KubeConfig # Filename inside the mountPath
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,6 +32,8 @@ spec:
       labels:
         app: (( values.deployment.label ))
     spec:
+      automountServiceAccountToken: (( optional(! values.runtime.separated, false) ))
+      serviceAccountName: (( optional( ! values.runtime.separated || true, values.deployment.name) ))
       containers:
         - name: dns-container
           # Use your actual image here. Using coredns/coredns as an example.
@@ -34,14 +51,17 @@ spec:
               protocol: UDP
 
           volumeMounts:
+            - <<<: (( optional(values.runtime.separated, helper.secret.mount) ))
             - name: config-volume
               mountPath: /etc/coredns # Mount point for the config file
               readOnly: true
 
+
       volumes:
+        - <<<: (( optional(values.runtime.separated, helper.secret.volume) ))
         - name: config-volume
-          configMap:
-            name: (( values.configmap.name )) # Must match the ConfigMap name above
+          secret:
+            secretName: (( values.config.name )) # Must match the ConfigMap name above
             items:
               - key: Corefile # Key in the ConfigMap
                 path: Corefile # Filename inside the mountPath
