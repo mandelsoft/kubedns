@@ -19,26 +19,26 @@ package main
 import (
 	"os"
 
+	"github.com/bombsimon/logrusr/v3"
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
 	"github.com/mandelsoft/kubedns/pkg/options/kubeconfigopts"
 	"github.com/mandelsoft/kubedns/pkg/options/manageropts"
-	"github.com/mandelsoft/kubedns/pkg/options/zapopts"
 	"github.com/mandelsoft/kubedns/pkg/setup"
+	"github.com/mandelsoft/logging/logrusl"
 	"k8s.io/client-go/kubernetes"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
+	corednscontroller "github.com/mandelsoft/kubedns/internal/controller/hostedzone"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	corednscontroller "github.com/mandelsoft/kubedns/internal/controller/coredns"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -55,16 +55,36 @@ func init() {
 
 // nolint:gocyclo
 func main() {
+
+	/*
+		logLogrus := logrus.New()
+
+		// Optional: Configure Logrus settings
+		logLogrus.SetFormatter(&logrus.JSONFormatter{})
+		logLogrus.SetOutput(os.Stdout)
+		logLogrus.SetLevel(logrus.DebugLevel)
+
+		// 2. Wrap Logrus with logrusr and set it as the controller-runtime logger
+		// The second argument is an optional name for the logger
+		logger := logrusr.New(logLogrus).V(4)
+		log.SetLogger(logger)
+	*/
+
+	l := logrusl.Human().NewLogrus()
+
+	ctrl.SetLogger(logrusr.New(l))
+
 	options := flagutils.DefaultOptionSet{}
 
+	mopts := manageropts.New(nil, scheme, "coredns.mandelsoft.org")
 	options.Add(
-		zapopts.New(&zap.Options{
-			Development: true,
-		}),
-		manageropts.New(kubeconfigopts.New("standard kubeconfig"), scheme, "coredns.mandelsoft.org"),
+		// zapopts.New(&zap.Options{
+		//	Development: true,
+		// }),
+		mopts,
 		// metrics.New(),
 		// webhookopts.New(),
-		corednscontroller.NewControllerOptions(),
+		hostedzone.NewOptions(kubeconfigopts.From(mopts)),
 	)
 
 	setup.Setup(options, os.Args[1:]...)
@@ -79,8 +99,9 @@ func main() {
 	}
 
 	if err := (&corednscontroller.HostedZoneReconciler{
+		Options:   corednscontroller.From(options),
 		Clientset: clientset,
-		Client:    mgr.GetClient(),
+		DataPlane: mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setup.SetupLog.Error(err, "unable to create controller", "controller", "HostedZone")
@@ -99,6 +120,7 @@ func main() {
 
 	corednscontroller.PrintManifests()
 	corednscontroller.RenderManifests()
+
 	setup.SetupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setup.SetupLog.Error(err, "problem running manager")

@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"reflect"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -34,13 +36,13 @@ type HostedZoneSpec struct {
 	// controller sets.
 	// It should only be set for root zones (without a parent).
 	// +optional
-	Class string `json:"class,omitempty"`
+	Class *string `json:"class,omitempty"`
 
-	// Runtime is ised to specify the logical runtime to use
-	// for deploying the promary DNS server.
+	// Runtime is used to specify the logical runtime to use
+	// for deploying the primary DNS server.
 	// It should only be set for root zones (without a parent).
 	// +optional
-	Runtime string `json:"runtime,omitempty"`
+	Runtime *string `json:"runtime,omitempty"`
 
 	// DomainNames is a set of domain names for the hosted zone.
 	// Formally, for every name a new DNS zone is managed.
@@ -64,6 +66,26 @@ type HostedZoneSpec struct {
 	// ParantRef is the name if a local hosted zone resource it is linked to.
 	// +optional
 	ParentRef string `json:"parentRef"`
+}
+
+type Observed struct {
+	// Class already used for implementation.
+	Class string `json:"class"`
+
+	// Runtime already used for implementation.
+	Runtime string `json:"runtime"`
+
+	// Secrets describes a list of generated secrets
+	// for remote runtime cluster access.
+	// There might be multiple ones to support future rolling updates.
+	Secrets []string `json:"secrets,omitempty"`
+}
+
+func (o *Observed) Equals( other *Observed)  bool {
+	if o == nil {
+		return other==nil
+	}
+	return reflect.DeepEqual(o, other)
 }
 
 // HostedZoneStatus defines the observed state of HostedZone.
@@ -99,6 +121,10 @@ type HostedZoneStatus struct {
 	// NameServers is a list of name servers for the hosted zone.
 	// +optional
 	NameServers []string `json:"nameServers"`
+
+	// Observed provides information about implementation.
+	// +optional
+	Observed *Observed `json:"observed,omitempty"`
 }
 
 // +kubebuilder:storageversion

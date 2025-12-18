@@ -18,7 +18,7 @@ data:
         zoneobject (( values.config.zone ))
         namespaces (( values.dataplane.namespace ))
         transitive
-        (( (values.runtime.separated || false ) ? "kubeconfig /etc/coredns/KubeConfig default" :"" ))
+        (( (values.runtime.separated || false ) ? "token /etc/coredns/token /etc/coredns/ca.crt" :"" ))
         ttl 30
       }
     }

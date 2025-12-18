@@ -115,8 +115,8 @@ spec:
                 type: integer
               runtime:
                 description: |-
-                  Runtime is ised to specify the logical runtime to use
-                  for deploying the promary DNS server.
+                  Runtime is used to specify the logical runtime to use
+                  for deploying the primary DNS server.
                   It should only be set for root zones (without a parent).
                 type: string
             required:
@@ -208,6 +208,27 @@ spec:
                 items:
                   type: string
                 type: array
+              observed:
+                description: Observed provides information about implementation.
+                properties:
+                  class:
+                    description: Class already used for implementation.
+                    type: string
+                  runtime:
+                    description: Runtime already used for implementation.
+                    type: string
+                  secrets:
+                    description: |-
+                      Secrets describes a list of generated secrets
+                      for remote runtime cluster access.
+                      There might be multiple ones to support future rolling updates.
+                    items:
+                      type: string
+                    type: array
+                required:
+                - class
+                - runtime
+                type: object
               state:
                 description: State of the hosted zone object
                 type: string

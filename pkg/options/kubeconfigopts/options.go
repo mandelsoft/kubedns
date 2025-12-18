@@ -17,7 +17,7 @@ type Options struct {
 
 	KubeConfig string
 	Context    string
-	// Config override sany option setting
+	FallBack *Options
 	Config *rest.Config
 }
 
@@ -34,15 +34,31 @@ func New(desc string, name ...string) *Options {
 	return &Options{name: general.Optional(name...), desc: desc}
 }
 
+func (o *Options) WithFallback(fb *Options) *Options {
+	o.FallBack = fb
+	return o
+}
+
 func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
+	if o.FallBack != nil {
+		err := v.Validate(ctx, opts, o.FallBack)
+		if err != nil {
+			return err
+		}
+	}
 	if o.Config == nil {
 		var err error
-		o.Config, err = kubeconfig.GetConfig(o.KubeConfig, o.Context)
-		if err != nil {
-			if o.name != "" {
-				return fmt.Errorf("%s: %w", o.name, err)
+
+		if o.KubeConfig == "" && o.FallBack != nil {
+			o.Config = o.FallBack.GetRestConfig()
+		} else {
+			o.Config, err = kubeconfig.GetConfig(o.KubeConfig, o.Context)
+			if err != nil {
+				if o.name != "" {
+					return fmt.Errorf("%s: %w", o.name, err)
+				}
+				return err
 			}
-			return err
 		}
 	}
 	return nil

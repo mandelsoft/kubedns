@@ -12,6 +12,10 @@ helper:
           items:
             - key: KubeConfig # Key in the ConfigMap
               path: KubeConfig # Filename inside the mountPath
+            - key: token # Key in the ConfigMap
+              path: token # Filename inside the mountPath
+            - key: ca.crt # Key in the ConfigMap
+              path: ca.crt # Filename inside the mountPath
 
 apiVersion: apps/v1
 kind: Deployment

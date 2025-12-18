@@ -1,4 +1,4 @@
-package coredns
+package hostedzone
 
 import (
 	"embed"
@@ -46,6 +46,7 @@ func PrintManifests() {
 		fmt.Printf("- %s\n", name)
 	}
 }
+
 func RenderManifests() {
 	manifests, err := GetManifests()
 	if err != nil {
@@ -54,13 +55,13 @@ func RenderManifests() {
 	values := map[string]interface{}{
 		"runtime": map[string]interface{}{
 			"namespace": "dnsservice",
-			//"separated": true,
+			// "separated": true,
 		},
 		"dataplane": map[string]interface{}{
 			"namespace": "ns",
-			//"server": "https://localhost:6443",
-			//"token": "some token",
-			//"cadata": "some cert",
+			// "server": "https://localhost:6443",
+			// "token": "some token",
+			// "cadata": "some cert",
 		},
 		"deployment": map[string]interface{}{
 			"name":     "dns-server-ns-hz",

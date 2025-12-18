@@ -4,9 +4,7 @@ import (
 	"context"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/kubedns/pkg/options/zapopts"
 	"github.com/spf13/pflag"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func Setup(options flagutils.OptionSet, args ... string)  {
@@ -17,7 +15,7 @@ func Setup(options flagutils.OptionSet, args ... string)  {
 		ExitIfErr(err, "parsing arguments")
 	}
 	err = flagutils.Validate(context.Background(), options, nil)
-	ctrl.SetLogger(zapopts.From(options).GetLogger())
+	//ctrl.SetLogger(zapopts.From(options).GetLogger())
 	if err != nil {
 		ExitIfErr(err, "validation failed")
 	}
