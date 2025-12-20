@@ -19,15 +19,12 @@ package main
 import (
 	"os"
 
-	"github.com/bombsimon/logrusr/v3"
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
 	"github.com/mandelsoft/kubedns/pkg/options/kubeconfigopts"
 	"github.com/mandelsoft/kubedns/pkg/options/manageropts"
 	"github.com/mandelsoft/kubedns/pkg/setup"
-	"github.com/mandelsoft/logging/logrusl"
 	"k8s.io/client-go/kubernetes"
-
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -55,25 +52,6 @@ func init() {
 
 // nolint:gocyclo
 func main() {
-
-	/*
-		logLogrus := logrus.New()
-
-		// Optional: Configure Logrus settings
-		logLogrus.SetFormatter(&logrus.JSONFormatter{})
-		logLogrus.SetOutput(os.Stdout)
-		logLogrus.SetLevel(logrus.DebugLevel)
-
-		// 2. Wrap Logrus with logrusr and set it as the controller-runtime logger
-		// The second argument is an optional name for the logger
-		logger := logrusr.New(logLogrus).V(4)
-		log.SetLogger(logger)
-	*/
-
-	l := logrusl.Human().NewLogrus()
-
-	ctrl.SetLogger(logrusr.New(l))
-
 	options := flagutils.DefaultOptionSet{}
 
 	mopts := manageropts.New(nil, scheme, "coredns.mandelsoft.org")
@@ -89,12 +67,16 @@ func main() {
 
 	setup.Setup(options, os.Args[1:]...)
 
+	setup.ExitIfErr(corednscontroller.TestRenderManifests(), "problems with included mainfests")
+
+	os.Exit(0)
+
 	mgr := manageropts.From(options).GetManager()
 
 	// Create the low-level Clientset from the Config
 	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
-		setup.SetupLog.Error(err, "unable to create clientset")
+		setup.Log.Error(err, "unable to create clientset")
 		os.Exit(1)
 	}
 
@@ -104,26 +86,23 @@ func main() {
 		DataPlane: mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setup.SetupLog.Error(err, "unable to create controller", "controller", "HostedZone")
+		setup.Log.Error(err, "unable to create controller", "controller", "HostedZone")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setup.SetupLog.Error(err, "unable to set up health check")
+		setup.Log.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setup.SetupLog.Error(err, "unable to set up ready check")
+		setup.Log.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
 
-	corednscontroller.PrintManifests()
-	corednscontroller.RenderManifests()
-
-	setup.SetupLog.Info("starting manager")
+	setup.Log.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setup.SetupLog.Error(err, "problem running manager")
+		setup.Log.Error(err, "problem running manager")
 		os.Exit(1)
 	}
 }

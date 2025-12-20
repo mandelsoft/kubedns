@@ -1,12 +1,15 @@
 package hostedzone
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io/fs"
 	"strings"
 
 	"github.com/mandelsoft/kubedns/pkg/render"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 //go:embed assets
@@ -47,40 +50,46 @@ func PrintManifests() {
 	}
 }
 
-func RenderManifests() {
+func TestRenderManifests() error {
 	manifests, err := GetManifests()
 	if err != nil {
-		panic(err)
+		return err
 	}
-	values := map[string]interface{}{
-		"runtime": map[string]interface{}{
-			"namespace": "dnsservice",
-			// "separated": true,
-		},
-		"dataplane": map[string]interface{}{
-			"namespace": "ns",
-			// "server": "https://localhost:6443",
-			// "token": "some token",
-			// "cadata": "some cert",
-		},
-		"deployment": map[string]interface{}{
-			"name":     "dns-server-ns-hz",
-			"label":    "dns-service-ns-hz",
-			"replicas": 3,
-		},
-		"service": map[string]interface{}{
-			"name": "dns-server-svc-ns-hz",
-		},
-		"config": map[string]interface{}{
-			"name": "dns-server-ns-hz",
-			"zone": "hz",
-		},
+	ctx := NewReconcileContext(context.Background(), log.Log, "http://api.server", client.ObjectKey{Name: "myzone", Namespace: "default"})
+	ctx.Simulate = true
+
+	r := &HostedZoneReconciler{
+		Options: NewOptions(nil),
+	}
+	values, err := ctx.Values(NewLocalMode(r))
+	if err != nil {
+		return fmt.Errorf("get local mode values: %w", err)
+	}
+	_, _, err = render.Render(manifests, values)
+	if err != nil {
+		return fmt.Errorf("local mode rendering: %w", err)
 	}
 
+	r.Options.RuntimeNamespace = ""
+	values, err = ctx.Values(NewRuntimeMode(r))
+	if err != nil {
+		return fmt.Errorf("get runtime mode values: %w", err)
+	}
 	dataplane, runtime, err := render.Render(manifests, values)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("runtime mode rendering: %w", err)
 	}
+
+	r.Options.RuntimeNamespace = "dns-runtime"
+	values, err = ctx.Values(NewRuntimeMode(r))
+	if err != nil {
+		return fmt.Errorf("get central runtime mode values: %w", err)
+	}
+	dataplane, runtime, err = render.Render(manifests, values)
+	if err != nil {
+		return fmt.Errorf("cenbtral runtime mode rendering: %w", err)
+	}
+
 	fmt.Printf("dataplane manifests:\n")
 	for k, v := range dataplane {
 		fmt.Printf("- %s:\n", k)
@@ -91,4 +100,5 @@ func RenderManifests() {
 		fmt.Printf("- %s:\n", k)
 		fmt.Printf("    %s\n", strings.Replace(string(v), "\n", "\n    ", -1))
 	}
+	return nil
 }

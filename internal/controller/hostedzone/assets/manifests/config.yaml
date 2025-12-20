@@ -1,10 +1,10 @@
 kind: ConfigMap
 metadata:
-  name: (( values.config.name ))
+  name: (( values.runtime.name ))
   namespace: (( values.runtime.namespace ))
   labels:
     target: runtime
-    app: (( values.deployment.label ))
+    app: (( values.runtime.label ))
 data:
   # The key name here ('Corefile') will be the filename in the volume mount
   Corefile: |
@@ -15,10 +15,11 @@ data:
       cache 30
       kubedyndns . {
         mode Primary
-        zoneobject (( values.config.zone ))
+        zoneobject (( values.dataplane.zone ))
         namespaces (( values.dataplane.namespace ))
         transitive
-        (( (values.runtime.separated || false ) ? "token /etc/coredns/token /etc/coredns/ca.crt" :"" ))
+        (( (values.runtime.secret != "" ) ? "endpoints " values.dataplane.server  :"" ))
+        (( (values.runtime.secret != "" ) ? "token /etc/coredns/token /etc/coredns/ca.crt" :"" ))
         ttl 30
       }
     }

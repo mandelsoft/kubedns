@@ -14,7 +14,7 @@ import (
 type Options struct {
 	webhookCertPath, webhookCertName, webhookCertKey string
 
-	tlsOpts           *tlsopts.Options
+	tlsOpts       *tlsopts.Options
 	webhookServer webhook.Server
 }
 
@@ -46,7 +46,7 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 }
 
 func (o *Options) GetServer() webhook.Server {
-	if o==nil {
+	if o == nil {
 		return nil
 	}
 	if o.webhookServer == nil {
@@ -60,7 +60,7 @@ func (o *Options) GetServer() webhook.Server {
 		}
 
 		if len(o.webhookCertPath) > 0 {
-			setup.SetupLog.Info("Initializing webhook certificate watcher using provided certificates",
+			setup.Log.Info("Initializing webhook certificate watcher using provided certificates",
 				"webhook-cert-path", o.webhookCertPath, "webhook-cert-name", o.webhookCertName, "webhook-cert-key", o.webhookCertKey)
 
 			webhookServerOptions.CertDir = o.webhookCertPath

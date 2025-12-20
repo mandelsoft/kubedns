@@ -89,15 +89,17 @@ func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// anonymous validation for responsibility fields
 	if !IsASCIIAlnumString(String(obj.Spec.Runtime, "")) || !IsASCIIAlnumString(String(obj.Spec.Class, "")) {
-		if err := r.UpdateCondition(ctx, obj, metav1.Condition{
+		mod, err := r.UpdateCondition(ctx, obj, metav1.Condition{
 			Type:               ValidationConditionType,
 			Status:             metav1.ConditionFalse, // Use metav1 constant
 			Reason:             ReasonInvalidParent,
 			Message:            "class and runtime must use ASCII alphanumeric characters, only.",
 			ObservedGeneration: obj.Generation,
-		}); err != nil {
-			return reconcile.Result{}, err
+		})
+		if mod && err == nil {
+			r.TriggerChildren(ctx, logger, req.NamespacedName)
 		}
+		return reconcile.Result{}, err
 	}
 
 	logger.Info("checking responsibility")
@@ -136,6 +138,8 @@ func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				return ctrl.Result{}, err
 			}
 		}
+
+		action.TriggerChildren()
 		// Stop reconciliation as the item is being deleted
 		return ctrl.Result{}, nil
 	}
@@ -169,6 +173,15 @@ func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return action.Reconcile()
 }
 
+func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger logr.Logger, obj client.ObjectKey) {
+	logger.Info("notify children about changes")
+	children := r.GetChildren(ctx, obj.Namespace, obj.Name)
+	for _, c := range children {
+		logger.Info("triggering child", "name", c.Name, "namespace", c.Namespace)
+		r.Mux.EnqueueByObject(&c)
+	}
+}
+
 func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logr.Logger, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, error) {
 	var parent corednsv1alpha1.HostedZone
 	var path string
@@ -183,7 +196,7 @@ func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logr.Logg
 			}
 			return nil, false, err
 		}
-		obj=&parent
+		obj = &parent
 	}
 	return &Responsibility{Root: obj, Runtime: String(obj.Spec.Runtime, ""), Class: String(obj.Spec.Class, "")}, true, nil
 }
@@ -217,7 +230,7 @@ func (r *HostedZoneReconciler) IsResponsibileFor(ctx context.Context, logger log
 		if ok {
 			// dangling object, always report problem
 			logger.Info("report dangling zone", "error", err.Error())
-			err = r.UpdateCondition(ctx, obj, metav1.Condition{
+			_, err = r.UpdateCondition(ctx, obj, metav1.Condition{
 				Type:               ValidationConditionType,
 				Status:             metav1.ConditionFalse, // Use metav1 constant
 				Reason:             ReasonInvalidParent,
@@ -239,7 +252,7 @@ func (r *HostedZoneReconciler) IsResponsibileFor(ctx context.Context, logger log
 
 }
 
-func (r *HostedZoneReconciler) UpdateCondition(ctx context.Context, instance *corednsv1alpha1.HostedZone, c metav1.Condition, mod ...bool) error {
+func (r *HostedZoneReconciler) UpdateCondition(ctx context.Context, instance *corednsv1alpha1.HostedZone, c metav1.Condition, mod ...bool) (bool, error) {
 	m := false
 	for _, v := range mod {
 		m = v || m
@@ -248,8 +261,9 @@ func (r *HostedZoneReconciler) UpdateCondition(ctx context.Context, instance *co
 
 	if meta.SetStatusCondition(conditions, c) || m {
 		if err := r.DataPlane.Status().Update(ctx, instance); err != nil {
-			return fmt.Errorf("failed to update status after successful validation: %w", err)
+			return false, fmt.Errorf("failed to update status after successful validation: %w", err)
 		}
+		return true, nil
 	}
-	return nil
+	return false, nil
 }

@@ -1,11 +1,11 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: (( values.deployment.name )) # Renamed the Role to reflect write access
+  name: (( values.dataplane.name )) # Renamed the Role to reflect write access
   namespace: (( values.dataplane.namespace ))
   labels:
     target: dataplane
-    app: (( values.deployment.label ))
+    app: (( values.dataplane.label ))
 rules:
   # Granting FULL access to common networking and discovery resources
   - apiGroups: ["coredns.mandelsoft.org"] # Core API Group

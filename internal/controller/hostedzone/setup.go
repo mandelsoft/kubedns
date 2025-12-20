@@ -21,7 +21,7 @@ func (r *HostedZoneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err != nil {
 		return err
 	}
-	_=src
+	_ = src
 
 	r.FieldManager = "hostedzone-controller"
 	if r.Options.Class != "" {
@@ -33,10 +33,10 @@ func (r *HostedZoneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	r.Finalizer = r.FieldManager
 
-	setup.SetupLog.Info("using Class", "class", r.Options.Class)
-	setup.SetupLog.Info("using Runtime", "runtime", r.Options.Runtime)
-	setup.SetupLog.Info("using FieldManger", "fieldmanager", r.FieldManager)
-	setup.SetupLog.Info("using Finalizer", "finalizer", r.Finalizer)
+	setup.Log.Info("for Class", "class", r.Options.Class)
+	setup.Log.Info("for Runtime", "runtime", r.Options.Runtime)
+	setup.Log.Info("using FieldManger", "fieldmanager", r.FieldManager)
+	setup.Log.Info("using Finalizer", "finalizer", r.Finalizer)
 
 	u, _, err := rest.DefaultServerUrlFor(mgr.GetConfig())
 	if err != nil {
@@ -57,15 +57,23 @@ func (r *HostedZoneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 	}
 
-	setup.SetupLog.Info("using dataplane cluster", "apiserver", mgr.GetConfig().Host)
-	if r.Runtime != r.DataPlane {
-		setup.SetupLog.Info("using separated runtime cluster", "apiserver", r.Options.RuntimeConfig.GetRestConfig().Host)
+	if r.Runtime == r.DataPlane && r.Options.RuntimeNamespace == "" {
+		setup.Log.Info("using Local mode")
+		r.Mode = NewLocalMode(r)
 	} else {
-		setup.SetupLog.Info("using same cluster as runtime")
+		setup.Log.Info("using Runtime mode", "runtime-namespace", r.Options.RuntimeNamespace)
+		r.Mode = NewRuntimeMode(r)
+	}
+
+	setup.Log.Info("using dataplane cluster", "apiserver", mgr.GetConfig().Host)
+	if r.Runtime != r.DataPlane {
+		setup.Log.Info("using separated runtime cluster", "apiserver", r.Options.RuntimeConfig.GetRestConfig().Host)
+	} else {
+		setup.Log.Info("using same cluster as runtime")
 	}
 
 	if r.IsSeparateRuntime() {
-		setup.SetupLog.Info("using separated runtime namespace", "namespace", r.Options.RuntimeNamespace)
+		setup.Log.Info("using separated runtime namespace", "namespace", r.Options.RuntimeNamespace)
 	}
 
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &corednsv1alpha1.HostedZone{}, IndexKeyParent, func(rawObj client.Object) []string {

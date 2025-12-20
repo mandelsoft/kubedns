@@ -82,7 +82,7 @@ func (o *Options) GetMetricsServerOpts() metricsserver.Options {
 	// managed by cert-manager for the metrics server.
 	// - [PROMETHEUS-WITH-CERTS] at config/prometheus/kustomization.yaml for TLS certification.
 	if len(o.MetricsCertPath) > 0 {
-		setup.SetupLog.Info("Initializing metrics certificate watcher using provided certificates",
+		setup.Log.Info("Initializing metrics certificate watcher using provided certificates",
 			"metrics-cert-path", o.MetricsCertPath, "metrics-cert-name", o.MetricsCertName, "metrics-cert-key", o.MetricsCertKey)
 
 		metricsServerOptions.CertDir = o.MetricsCertPath

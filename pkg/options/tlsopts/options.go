@@ -9,7 +9,7 @@ import (
 )
 
 type Options struct {
-	EnableHTTP2          bool
+	EnableHTTP2 bool
 }
 
 func From(set flagutils.OptionSet) *Options {
@@ -28,7 +28,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *Options) TlsOpts() []func(*tls.Config) {
-	if o!=nil && o.EnableHTTP2 {
+	if o != nil && o.EnableHTTP2 {
 		return []func(*tls.Config){disableHTTP2}
 	}
 	return nil
@@ -43,6 +43,6 @@ func (o *Options) TlsOpts() []func(*tls.Config) {
 // - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
 // - https://github.com/advisories/GHSA-4374-p667-p6c8
 var disableHTTP2 = func(c *tls.Config) {
-	setup.SetupLog.Info("disabling http/2")
+	setup.Log.Info("disabling http/2")
 	c.NextProtos = []string{"http/1.1"}
 }

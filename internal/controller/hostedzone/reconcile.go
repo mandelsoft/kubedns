@@ -3,7 +3,6 @@ package hostedzone
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	"github.com/go-logr/logr"
 	"github.com/mandelsoft/goutils/generics"
@@ -21,27 +20,27 @@ import (
 )
 
 type ReconcileRequest struct {
-	logr.Logger
-	instance   *corev1alpha1.HostedZone
+	ReconcileContext
 	reconciler *HostedZoneReconciler
-	ctx        context.Context
+	instance   *corev1alpha1.HostedZone
 }
 
 func NewRequest(ctx context.Context, l logr.Logger, reconciler *HostedZoneReconciler, instance *corev1alpha1.HostedZone) *ReconcileRequest {
 	return &ReconcileRequest{
-		Logger:     l,
-		ctx:        ctx,
-		reconciler: reconciler,
-		instance:   instance,
+		ReconcileContext: NewReconcileContext(ctx, l, reconciler.DataPlaneURL, client.ObjectKeyFromObject(instance)),
+		reconciler:       reconciler,
+		instance:         instance,
 	}
 }
 
 func (r *ReconcileRequest) Reconcile() (ctrl.Result, error) {
+	mod := false
+
 	reason, err := r.Validate()
 	if err != nil {
 		if reason != "" {
 			// --- Validation Failed: Use meta.SetStatusCondition to set ConditionFalse ---
-			if err = r.reconciler.UpdateCondition(r.ctx, r.instance, metav1.Condition{
+			if mod, err = r.reconciler.UpdateCondition(r, r.instance, metav1.Condition{
 				Type:               ValidationConditionType,
 				Status:             metav1.ConditionFalse, // Use metav1 constant
 				Reason:             reason,
@@ -50,6 +49,9 @@ func (r *ReconcileRequest) Reconcile() (ctrl.Result, error) {
 			}); err != nil {
 				return reconcile.Result{}, err
 			}
+		}
+		if mod {
+			r.TriggerChildren()
 		}
 		return reconcile.Result{}, err
 	}
@@ -68,7 +70,7 @@ func (r *ReconcileRequest) Reconcile() (ctrl.Result, error) {
 
 	r.Logger.Info("validation succeeded")
 	// --- Validation Succeeded: Use meta.SetStatusCondition to set ConditionTrue ---
-	if err = r.reconciler.UpdateCondition(r.ctx,
+	if mod, err = r.reconciler.UpdateCondition(r,
 		r.instance, metav1.Condition{
 			Type:    ValidationConditionType,
 			Status:  metav1.ConditionTrue,
@@ -80,22 +82,31 @@ func (r *ReconcileRequest) Reconcile() (ctrl.Result, error) {
 		return reconcile.Result{}, err
 	}
 
+	if mod {
+		r.TriggerChildren()
+	}
+
+	if r.instance.Spec.ParentRef == "" {
+		return reconcile.Result{}, nil
+	}
 	return r.HandleExternalResources()
 
 }
 func (r *ReconcileRequest) HandleExternalResources() (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 
+	key := client.ObjectKeyFromObject(r.instance)
+
 	if r.reconciler.IsSeparateRuntime() {
 		// assure target namespace
 		var ns v1.Namespace
-		namespace := r.reconciler.Mode.GetRuntimeNamespace(r)
-		err := r.reconciler.Runtime.Get(r.ctx, client.ObjectKey{Name: namespace}, &ns)
+		namespace := r.reconciler.Mode.RuntimeNamespace(key)
+		err := r.reconciler.Runtime.Get(r, client.ObjectKey{Name: namespace}, &ns)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				r.Info("assure target namespace", "namespace", namespace)
-				ns.Name = r.reconciler.Mode.GetRuntimeNamespace(r)
-				err = r.reconciler.Runtime.Create(r.ctx, &ns)
+				ns.Name = r.reconciler.Mode.RuntimeNamespace(key)
+				err = r.reconciler.Runtime.Create(r, &ns)
 			}
 		}
 		if err != nil {
@@ -103,8 +114,12 @@ func (r *ReconcileRequest) HandleExternalResources() (ctrl.Result, error) {
 		}
 	}
 
-	values := r.Values()
+	values, repeat := r.Values(r.reconciler.Mode)
 
+	// even if access for credentials has been failed, the dataplane is applied.
+	// this may create a secret required to get the access token.
+
+	r.Logger.Info("updating dataplane")
 	dataplane, runtime, err := render.Render(r.reconciler.Manifests, values)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -117,24 +132,28 @@ func (r *ReconcileRequest) HandleExternalResources() (ctrl.Result, error) {
 		}
 	}
 
-	access := r.reconciler.Mode.AccessValues(r)
+	// if credential access failed, retry the reconcilation
+	if repeat != nil {
+		return ctrl.Result{}, repeat
+	}
 
-	if !r.reconciler.IsSeparateRuntime() || access != nil {
-		if !reflect.DeepEqual(access, GetAccessValues(values)) {
-			values["dataplane"] = merge(values["dataplane"].(map[string]interface{}), access)
-			_, runtime, err = render.Render(r.reconciler.Manifests, values)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-		}
+	if false {
+		r.Logger.Info("updating runtime")
 		for _, data := range runtime {
 			_, err := r.ClientSideApply("runtime", r.reconciler.Runtime, data)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
 		}
+	} else {
+		r.Logger.Info("skipping runtime deployment")
 	}
+
 	return ctrl.Result{}, nil
+}
+
+func (r *ReconcileRequest) TriggerChildren() {
+	r.reconciler.TriggerChildren(r, r.Logger, client.ObjectKeyFromObject(r.instance))
 }
 
 // ServerSideApply ensures the cluster state matches the manifest without
@@ -153,7 +172,7 @@ func (r *ReconcileRequest) ServerSideApply(target string, clt client.Client, man
 	// - client.Apply: Tells K8s to merge this with the existing object.
 	// - FieldManager: Identifies your controller as the owner of THESE specific fields.
 	// - ForceOwnership: If a human manually changed a field you own, this overrides it.
-	err = clt.Patch(r.ctx, obj, client.Apply, &client.PatchOptions{
+	err = clt.Patch(r, obj, client.Apply, &client.PatchOptions{
 		FieldManager: r.reconciler.FieldManager,
 		Force:        generics.PointerTo(true),
 	})
@@ -165,31 +184,61 @@ func (r *ReconcileRequest) ServerSideApply(target string, clt client.Client, man
 	return nil
 }
 
+func (r *ReconcileRequest) Delete(target string, clt client.Client, manifest []byte) error {
+	obj := unstructured.Unstructured{}
+	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	_, _, err := dec.Decode(manifest, nil, &obj)
+	if err != nil {
+		return err
+	}
+
+	current := unstructured.Unstructured{}
+	current.SetGroupVersionKind(obj.GroupVersionKind())
+	key := client.ObjectKey{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}
+	err = clt.Get(r, key, &current)
+
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if !current.GetDeletionTimestamp().IsZero() {
+		return fmt.Errorf("resource %q is still being deleted", key)
+	}
+	r.Info("deleting object", "name", key.Name, "namespace", key.Namespace, "target", target, "groupkind", obj.GroupVersionKind())
+	err = clt.Delete(r, &obj)
+	return err
+}
+
 func (r *ReconcileRequest) ClientSideApply(target string, clt client.Client, manifest []byte) (*unstructured.Unstructured, error) {
 	// 1. Decode bytes into a 'desired' unstructured object
-	desired := &unstructured.Unstructured{}
+	desired := unstructured.Unstructured{}
 	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
-	_, _, err := dec.Decode(manifest, nil, desired)
+	_, _, err := dec.Decode(manifest, nil, &desired)
 	if err != nil {
 		return nil, err
 	}
 
 	// 2. Try to get the current object from the cluster
-	current := &unstructured.Unstructured{}
+	current := unstructured.Unstructured{}
 	current.SetGroupVersionKind(desired.GroupVersionKind())
-	err = clt.Get(r.ctx, client.ObjectKey{
+	err = clt.Get(r, client.ObjectKey{
 		Namespace: desired.GetNamespace(),
 		Name:      desired.GetName(),
-	}, current)
+	}, &current)
 
 	if errors.IsNotFound(err) {
 		r.Info("creating resource", "target", target, "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind())
 		// PATH A: Create if not found
-		return desired, clt.Create(r.ctx, desired, &client.CreateOptions{
+		return &desired, clt.Create(r, &desired, &client.CreateOptions{
 			FieldManager: r.reconciler.FieldManager,
 		})
 	} else if err != nil {
-		return desired, err
+		return &desired, err
 	}
 
 	// PATH B: Patch existing object
@@ -204,7 +253,7 @@ func (r *ReconcileRequest) ClientSideApply(target string, clt client.Client, man
 	current.Object["spec"] = desired.Object["spec"]
 	current.SetLabels(desired.GetLabels())
 	current.SetAnnotations(desired.GetAnnotations())
-	patchData, err := patch.Data(current)
+	patchData, err := patch.Data(&current)
 	if err != nil {
 		return nil, err
 	}
@@ -213,11 +262,11 @@ func (r *ReconcileRequest) ClientSideApply(target string, clt client.Client, man
 	if string(patchData) == "{}" {
 		r.Info("resource uptodate", "target", target, "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind())
 
-		return desired, nil // No changes, exit early
+		return &desired, nil // No changes, exit early
 	}
 
 	r.Info("apply patch", "target", target, "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind())
-	return desired, clt.Patch(r.ctx, current, rawPatch, &client.PatchOptions{
+	return &desired, clt.Patch(r, &current, rawPatch, &client.PatchOptions{
 		FieldManager: r.reconciler.FieldManager,
 	})
 }
@@ -234,47 +283,4 @@ func GetAccessValues(in map[string]interface{}) map[string]interface{} {
 		}
 	}
 	return nil
-}
-
-func (r *ReconcileRequest) DeploymentName(instance *corev1alpha1.HostedZone) string {
-	return fmt.Sprintf("dns-%s-%s", instance.Namespace, instance.Name)
-}
-
-func (r *ReconcileRequest) Values() map[string]interface{} {
-	name := fmt.Sprintf("%s-%s", r.instance.Namespace, r.instance.Name)
-	return map[string]interface{}{
-		"runtime": map[string]interface{}{
-			"namespace": r.reconciler.Mode.GetRuntimeNamespace(r),
-			"separated": r.reconciler.IsSeparateRuntime(),
-		},
-		"dataplane": merge(map[string]interface{}{
-			"namespace": r.instance.Namespace,
-			"server":    r.reconciler.DataPlaneURL,
-			"token":     "",
-			"cadata":    "",
-		}, r.reconciler.Mode.AccessValues(r)),
-		"deployment": map[string]interface{}{
-			"name":     r.DeploymentName(r.instance),
-			"label":    "dns-service-" + name,
-			"replicas": 1,
-		},
-		"service": map[string]interface{}{
-			"name": "dns-server-" + name,
-		},
-		"config": map[string]interface{}{
-			"name": "dns-server-" + name,
-			"zone": r.instance.Name,
-		},
-	}
-
-}
-
-func merge(dst, src map[string]interface{}) map[string]interface{} {
-	if dst == nil {
-		dst = make(map[string]interface{})
-	}
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
 }
