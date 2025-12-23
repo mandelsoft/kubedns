@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
+	"github.com/mandelsoft/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const BASE = "dns-service"
 
 type ReconcileContext struct {
-	logr.Logger
+	logging.Logger
 	context.Context
 	client.ObjectKey
 	DataPlaneURL string
@@ -19,7 +19,7 @@ type ReconcileContext struct {
 	Simulate bool
 }
 
-func NewReconcileContext(ctx context.Context, log logr.Logger, server string, key client.ObjectKey) ReconcileContext {
+func NewReconcileContext(ctx context.Context, log logging.Logger, server string, key client.ObjectKey) ReconcileContext {
 	return ReconcileContext{Logger: log, Context: ctx, ObjectKey: key, DataPlaneURL: server}
 }
 
@@ -58,11 +58,11 @@ func (r *ReconcileContext) Values(m Mode) (map[string]interface{}, error) {
 	if repeat != nil {
 		r.Logger.Info("no access info -> must repeat")
 	}
-	merge(access, tmp)
+	mergeValues(access, tmp)
 	return values, repeat
 }
 
-func merge(dst, src map[string]interface{}) map[string]interface{} {
+func mergeValues(dst, src map[string]interface{}) map[string]interface{} {
 	if dst == nil {
 		dst = make(map[string]interface{})
 	}

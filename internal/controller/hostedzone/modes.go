@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,7 +18,8 @@ type Mode interface {
 
 	AccessValues(ctx ReconcileContext, name string) (map[string]interface{}, error)
 
-	Delete(ctx ReconcileContext, name string) error
+	Prepare(ctx ReconcileContext) error
+	Cleanup(ctx ReconcileContext, name string) error
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -54,7 +56,11 @@ func (m *LocalMode) AccessValues(ReconcileContext, string) (map[string]interface
 	return nil, nil
 }
 
-func (r *LocalMode) Delete(ctx ReconcileContext, name string) error {
+func (m *LocalMode) Prepare(ctx ReconcileContext) error {
+	return nil
+}
+
+func (r *LocalMode) Cleanup(ctx ReconcileContext, name string) error {
 	return nil
 }
 
@@ -108,12 +114,15 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string) (map[strin
 				secret.Type = v1.SecretTypeServiceAccountToken
 				secret.Finalizers = []string{m.Finalizer}
 				secret.SetAnnotations(
-					map[string]string{v1.ServiceAccountNameKey: name},
+					map[string]string{
+						v1.ServiceAccountNameKey:   name,
+						"mandelsoft.org/generated": GENERATED,
+					},
 				)
 				err = m.DataPlane.Create(ctx, &secret)
 			}
 			if err != nil {
-				ctx.Error(err, "cannot get secret", "name", name)
+				ctx.LogError(err, "cannot get secret", "name", name)
 				return nil, err
 			}
 		}
@@ -123,15 +132,33 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string) (map[strin
 	if token == nil {
 		return nil, fmt.Errorf("token not yet available")
 	}
+	ctx.Info("token found for serviceaccount", "name", name)
 	access := map[string]interface{}{}
+	access["token"] = string(token)
 	cert := secret.Data["ca.crt"]
 	if cert != nil {
-		access["ca.crt"] = string(cert)
+		access["cadata"] = string(cert)
 	}
 	return access, nil
 }
 
-func (m *RuntimeMode) Delete(ctx ReconcileContext, name string) error {
+func (m *RuntimeMode) Prepare(ctx ReconcileContext) error {
+	// assure target namespace
+	var ns v1.Namespace
+	namespace := m.RuntimeNamespace(ctx.ObjectKey)
+	err := m.Runtime.Get(ctx, client.ObjectKey{Name: namespace}, &ns)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			ctx.Info("assure target namespace", "namespace", namespace)
+			ns.Name = namespace
+			err = m.Runtime.Create(ctx, &ns)
+		}
+	}
+	return err
+}
+
+func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) error {
+
 	var secret v1.Secret
 	err := m.DataPlane.Get(ctx, client.ObjectKey{Namespace: ctx.Namespace, Name: name}, &secret)
 	if err != nil {
@@ -149,6 +176,34 @@ func (m *RuntimeMode) Delete(ctx ReconcileContext, name string) error {
 	if secret.GetDeletionTimestamp().IsZero() {
 		ctx.Info("request deletion of secret")
 		err = m.DataPlane.Delete(ctx, &secret)
+	}
+
+	if m.Options.RuntimeNamespace == "" {
+		var ns v1.Namespace
+		namespace := m.RuntimeNamespace(ctx.ObjectKey)
+		err := m.Runtime.Get(ctx, client.ObjectKey{Name: namespace}, &ns)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		if len(ns.Finalizers) > 0 {
+			return nil
+		}
+		var list corednsv1alpha1.HostedZoneList
+		// try to delete dedicated namespace
+		err = m.DataPlane.List(ctx, &list, &client.ListOptions{Namespace: namespace})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		if len(list.Items) > 1 {
+			// TODO: could delete temp namespace, but what about race conditions.
+			// there is no undelete if deletion timestamp is already set.
+		}
 	}
 	return err
 }

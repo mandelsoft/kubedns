@@ -2,6 +2,7 @@ package hostedzone
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/general"
@@ -13,10 +14,16 @@ import (
 )
 
 type Options struct {
-	Runtime       string
-	Class         string
+	Runtime          string
+	Class            string
+	DNSDomain        string
+	DNSNamespace     string
+	DNSMode          string
 	RuntimeNamespace string
+
 	RuntimeConfig *kubeconfigopts.Options
+
+	DNSHandler DNSHandler
 }
 
 func From(opts flagutils.OptionSetProvider) *Options {
@@ -36,6 +43,14 @@ func NewOptions(def ...*kubeconfigopts.Options) *Options {
 }
 
 func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
+	switch o.DNSMode {
+	case "loadbalancer":
+		o.DNSHandler = NewDNSByLoadBalancer()
+	// case "gardener":
+	// case "local":
+	default:
+		return fmt.Errorf("unsupported ns-mode %q", o.DNSMode)
+	}
 	return o.RuntimeConfig.Validate(ctx, opts, v)
 }
 
@@ -44,6 +59,10 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&o.RuntimeNamespace, "runtime-namespace", "", "", "use single runtime namespace for deployments")
 	fs.StringVarP(&o.Runtime, "runtime", "", "", "name of the runtime class to handle")
 	fs.StringVarP(&o.Class, "class", "", "", "name of the controller class to handle")
+
+	fs.StringVarP(&o.DNSMode, "ns-mode", "", "loadbalancer", "DNS mode for providing nameserver cnames")
+	fs.StringVarP(&o.DNSDomain, "ns-domain", "", "", "DNS domain for managed nameserver DNS names")
+	fs.StringVarP(&o.DNSNamespace, "ns-namespace", "", "", "Dnamespace used to request nameserver DNS names")
 }
 
 func (o *Options) Configure(ctx context.Context, cfg *ctrl.Options, opts flagutils.OptionSet, v flagutils.ValidationSet) error {

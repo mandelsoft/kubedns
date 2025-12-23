@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/go-logr/logr"
+	"github.com/mandelsoft/logging"
 	"github.com/mandelsoft/logging/logrusl"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -17,7 +18,11 @@ var Log logr.Logger
 // at different times it is not possible just to shift
 // the level, we have to manipulate the commonly used sink, instead.
 func init() {
-	ctrl.SetLogger(LoggerWithShiftedSinkLevel(logrusl.Human().NewLogr(), 3))
+	base := logrusl.Human().NewLogr()
+
+	logging.DefaultContext().SetBaseLogger(base)
+
+	ctrl.SetLogger(LoggerWithShiftedSinkLevel(base, 3))
 	log.Log = ctrl.Log
 	Log = ctrl.Log.WithName("setup")
 }

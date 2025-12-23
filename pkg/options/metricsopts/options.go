@@ -53,7 +53,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 
 func (o *Options) GetMetricsServerOpts() metricsserver.Options {
 	if o == nil {
-		return metricsserver.Options{}
+		return metricsserver.Options{BindAddress: "0"}
 	}
 	// Metrics endpoint is enabled in 'config/default/kustomization.yaml'. The Metrics options configure the server.
 	// More info:

@@ -24,7 +24,6 @@ import (
 	"github.com/mandelsoft/kubedns/pkg/options/kubeconfigopts"
 	"github.com/mandelsoft/kubedns/pkg/options/manageropts"
 	"github.com/mandelsoft/kubedns/pkg/setup"
-	"k8s.io/client-go/kubernetes"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -69,22 +68,10 @@ func main() {
 
 	setup.ExitIfErr(corednscontroller.TestRenderManifests(), "problems with included mainfests")
 
-	os.Exit(0)
-
 	mgr := manageropts.From(options).GetManager()
 
-	// Create the low-level Clientset from the Config
-	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		setup.Log.Error(err, "unable to create clientset")
-		os.Exit(1)
-	}
-
 	if err := (&corednscontroller.HostedZoneReconciler{
-		Options:   corednscontroller.From(options),
-		Clientset: clientset,
-		DataPlane: mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
+		Options: corednscontroller.From(options),
 	}).SetupWithManager(mgr); err != nil {
 		setup.Log.Error(err, "unable to create controller", "controller", "HostedZone")
 		os.Exit(1)

@@ -24,7 +24,7 @@ func (r *ReconcileRequest) DeleteExternalResources() error {
 	}
 
 	if err == nil {
-		err = r.reconciler.Mode.Delete(r.ReconcileContext, values["dataplane"].(map[string]interface{})["name"].(string))
+		err = r.reconciler.Mode.Cleanup(r.ReconcileContext, values["dataplane"].(map[string]interface{})["name"].(string))
 	}
 	return err
 }

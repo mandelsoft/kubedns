@@ -74,16 +74,11 @@ type Observed struct {
 
 	// Runtime already used for implementation.
 	Runtime string `json:"runtime"`
-
-	// Secrets describes a list of generated secrets
-	// for remote runtime cluster access.
-	// There might be multiple ones to support future rolling updates.
-	Secrets []string `json:"secrets,omitempty"`
 }
 
-func (o *Observed) Equals( other *Observed)  bool {
+func (o *Observed) Equals(other *Observed) bool {
 	if o == nil {
-		return other==nil
+		return other == nil
 	}
 	return reflect.DeepEqual(o, other)
 }

@@ -32,6 +32,9 @@ type Comparable[T any] interface {
 }
 
 func SetPointerField[T any, P Comparable[T]](target *P, value P) bool {
+	if *target == value {
+		return false
+	}
 	if *target != nil {
 		if !(*target).Equals(value) {
 			return false
@@ -55,7 +58,7 @@ func IsASCIIAlnumString(s string) bool {
 
 func (r *ReconcileRequest) Validate() (string, error) {
 	if len(r.instance.Spec.DomainNames) == 0 {
-		return ReasonConfigurarationValid, fmt.Errorf("at one domain name required")
+		return ReasonDomainNameMissing, fmt.Errorf("at one domain name required")
 	}
 	if r.instance.Spec.EMail == "" {
 		return ReasonEMailMissing, fmt.Errorf("email address required")

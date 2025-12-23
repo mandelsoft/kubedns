@@ -4,26 +4,34 @@ import (
 	"context"
 
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
+	"github.com/mandelsoft/kubedns/pkg/clusterutils"
 	"github.com/mandelsoft/kubedns/pkg/enqueue"
+	"github.com/mandelsoft/kubedns/pkg/objutils"
+	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/kubedns/pkg/setup"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 )
 
 const IndexKeyParent = "hostedzone.parent"
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *HostedZoneReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.DataPlane = clusterutils.NewClusterForCluster("dataplane", mgr)
+
 	r.Mux = enqueue.NewMux(mgr.GetScheme())
 
-	src, err := r.Mux.Source(&corednsv1alpha1.HostedZone{})
+	trigger, err := r.Mux.Source(&corednsv1alpha1.HostedZone{})
 	if err != nil {
 		return err
 	}
-	_ = src
+	_ = trigger
 
-	r.FieldManager = "hostedzone-controller"
+	r.FieldManager = "coredns.mandelsoft.org/hostedzone"
 	if r.Options.Class != "" {
 		r.FieldManager += "-" + r.Options.Class
 	}
@@ -37,6 +45,7 @@ func (r *HostedZoneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	setup.Log.Info("for Runtime", "runtime", r.Options.Runtime)
 	setup.Log.Info("using FieldManger", "fieldmanager", r.FieldManager)
 	setup.Log.Info("using Finalizer", "finalizer", r.Finalizer)
+	setup.Log.Info("using Nameserver mode", "mode", r.Options.DNSMode)
 
 	u, _, err := rest.DefaultServerUrlFor(mgr.GetConfig())
 	if err != nil {
@@ -49,31 +58,38 @@ func (r *HostedZoneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	r.Manifests = m
 	if mgr.GetConfig() == r.Options.RuntimeConfig.GetRestConfig() {
-		r.Runtime = r.DataPlane
+		r.Runtime = clusterutils.NewAlias("runtime", r.DataPlane)
 	} else {
-		r.Runtime, err = client.New(r.Options.RuntimeConfig.GetRestConfig(), client.Options{Scheme: mgr.GetScheme()})
+		r.Runtime, err = clusterutils.NewCluster("runtime", r.Options.RuntimeConfig.GetRestConfig(), func(opts *cluster.Options) {
+			opts.Scheme = mgr.GetScheme()
+		})
+		mgr.Add(r.Runtime)
 		if err != nil {
 			return err
 		}
 	}
 
-	if r.Runtime == r.DataPlane && r.Options.RuntimeNamespace == "" {
+	if r.IsSeparateRuntime() {
+		setup.Log.Info("using separated runtime namespace", "namespace", r.Options.RuntimeNamespace)
+		setup.Log.Info("using Runtime mode")
+		r.Mode = NewRuntimeMode(r)
+		r.runtimeOwner = owner.RemoteOwner("coredns.mandelsoft.org/owner-id", r.Options.Class)
+	} else {
 		setup.Log.Info("using Local mode")
 		r.Mode = NewLocalMode(r)
-	} else {
-		setup.Log.Info("using Runtime mode", "runtime-namespace", r.Options.RuntimeNamespace)
-		r.Mode = NewRuntimeMode(r)
+		r.runtimeOwner = owner.LocalOwner(r.DataPlane.GetScheme())
 	}
+
+	r.runtimeOwner = owner.Conditional(r.runtimeOwner, objutils.Or(
+		objutils.GroupKindFilter("core", "Service"),
+		objutils.GroupKindFilter("apps", "Deployment"),
+	))
 
 	setup.Log.Info("using dataplane cluster", "apiserver", mgr.GetConfig().Host)
 	if r.Runtime != r.DataPlane {
 		setup.Log.Info("using separated runtime cluster", "apiserver", r.Options.RuntimeConfig.GetRestConfig().Host)
 	} else {
 		setup.Log.Info("using same cluster as runtime")
-	}
-
-	if r.IsSeparateRuntime() {
-		setup.Log.Info("using separated runtime namespace", "namespace", r.Options.RuntimeNamespace)
 	}
 
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &corednsv1alpha1.HostedZone{}, IndexKeyParent, func(rawObj client.Object) []string {
@@ -88,12 +104,19 @@ func (r *HostedZoneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corednsv1alpha1.HostedZone{}).
-		Named("coredns-hostedzone"). // WatchesRawSource(src).
+		Named("coredns-hostedzone").
+		WatchesRawSource(trigger).
+		WatchesRawSource(
+			owner.WatchSourceForSlave[*appsv1.Deployment, *corednsv1alpha1.HostedZone](r.Runtime, r.runtimeOwner, r.DataPlane),
+		).
+		WatchesRawSource(
+			owner.WatchSourceForSlave[*corev1.Service, *corednsv1alpha1.HostedZone](r.Runtime, r.runtimeOwner, r.DataPlane),
+		).
 		Complete(r)
 }
 
 func (r *HostedZoneReconciler) IsSeparateRuntime() bool {
-	return r.Options.RuntimeNamespace != "" || r.DataPlane != r.Runtime
+	return r.Options.RuntimeNamespace != "" || r.DataPlane.GetClient() != r.Runtime.GetClient()
 }
 
 func (r *HostedZoneReconciler) GetChildren(ctx context.Context, ns string, n string) []corednsv1alpha1.HostedZone {
