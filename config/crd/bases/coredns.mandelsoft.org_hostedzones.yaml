@@ -8,6 +8,8 @@ metadata:
 spec:
   group: coredns.mandelsoft.org
   names:
+    categories:
+    - dns
     kind: HostedZone
     listKind: HostedZoneList
     plural: hostedzones
@@ -17,7 +19,7 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.domainName
+    - jsonPath: .spec.domainNames
       name: Domain
       type: string
     - jsonPath: .spec.parentRef
@@ -217,14 +219,6 @@ spec:
                   runtime:
                     description: Runtime already used for implementation.
                     type: string
-                  secrets:
-                    description: |-
-                      Secrets describes a list of generated secrets
-                      for remote runtime cluster access.
-                      There might be multiple ones to support future rolling updates.
-                    items:
-                      type: string
-                    type: array
                 required:
                 - class
                 - runtime

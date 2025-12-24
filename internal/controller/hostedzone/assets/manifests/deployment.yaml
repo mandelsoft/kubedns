@@ -2,16 +2,14 @@ helper:
   <<<: (( &temporary ))
   secret:
     mount:
-      name: secret-volume
-      mountPath: /etc/coredns # Mount point for the config file
-      readOnly: true
+      - name: secret-volume
+        mountPath: /etc/coredns/access
+        readOnly: true
     volume:
       - name: secret-volume
         secret:
           secretName: (( values.runtime.secret.name )) # Must match the secret name
           items:
-            - key: KubeConfig # Key in the ConfigMap
-              path: KubeConfig # Filename inside the mountPath
             - key: token # Key in the ConfigMap
               path: token # Filename inside the mountPath
             - key: ca.crt # Key in the ConfigMap
@@ -43,12 +41,12 @@ spec:
         - name: dns-container
           # Use your actual image here. Using coredns/coredns as an example.
           image: mandelsoft/coredns:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
 
           # Pass the config file path via the --corefile option
           args:
             - -conf
-            - /etc/coredns/Corefile # Path to the mounted config file
+            - /etc/coredns/config/Corefile # Path to the mounted config file
 
           ports:
             - containerPort: 53
@@ -58,7 +56,7 @@ spec:
           volumeMounts:
             - <<<: (( optional(values.runtime.secret.name != "", helper.secret.mount) ))
             - name: config-volume
-              mountPath: /etc/coredns # Mount point for the config file
+              mountPath: /etc/coredns/config # Mount point for the config file
               readOnly: true
 
 

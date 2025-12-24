@@ -2,6 +2,8 @@ package hostedzone
 
 import (
 	"fmt"
+
+	"github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 )
 
 func String(s *string, def string) string {
@@ -58,25 +60,25 @@ func IsASCIIAlnumString(s string) bool {
 
 func (r *ReconcileRequest) Validate() (string, error) {
 	if len(r.instance.Spec.DomainNames) == 0 {
-		return ReasonDomainNameMissing, fmt.Errorf("at one domain name required")
+		return v1alpha1.ReasonDomainNameMissing, fmt.Errorf("at one domain name required")
 	}
 	if r.instance.Spec.EMail == "" {
-		return ReasonEMailMissing, fmt.Errorf("email address required")
+		return v1alpha1.ReasonEMailMissing, fmt.Errorf("email address required")
 	}
 	if r.instance.Spec.Expire == 0 {
-		return ReasonExpireMissing, fmt.Errorf("expire required")
+		return v1alpha1.ReasonExpireMissing, fmt.Errorf("expire required")
 	}
 	if r.instance.Spec.Refresh == 0 || r.instance.Spec.Retry == 0 || r.instance.Spec.MinimumTTL == 0 {
-		return ReasonTTLMissing, fmt.Errorf("refresh, retry or minimumTTL required")
+		return v1alpha1.ReasonTTLMissing, fmt.Errorf("refresh, retry or minimumTTL required")
 	}
 
 	if r.instance.Spec.ParentRef != "" {
 		if r.instance.Spec.Runtime != nil {
-			return ReasonInvalidNesting, fmt.Errorf("runtime set for nested zone")
+			return v1alpha1.ReasonInvalidNesting, fmt.Errorf("runtime set for nested zone")
 		}
 		if r.instance.Spec.Class != nil {
-			return ReasonInvalidNesting, fmt.Errorf("class set for nested zone")
+			return v1alpha1.ReasonInvalidNesting, fmt.Errorf("class set for nested zone")
 		}
 	}
-	return ReasonConfigurarationValid, nil
+	return v1alpha1.ReasonConfigurarationValid, nil
 }

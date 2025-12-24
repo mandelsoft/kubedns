@@ -11,12 +11,14 @@ metadata:
   labels:
     app.kubernetes.io/name: kubedns
     app.kubernetes.io/managed-by: kustomize
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
   name: coredns-hostedzone-admin-role
 rules:
 - apiGroups:
   - coredns.mandelsoft.org
   resources:
   - hostedzones
+  - corednsentries
   verbs:
   - '*'
 - apiGroups:

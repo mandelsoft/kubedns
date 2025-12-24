@@ -20,7 +20,7 @@ data:
         namespaces (( values.dataplane.namespace ))
         transitive
         (( (values.runtime.secret != "" ) ? "endpoint " values.dataplane.server  :"" ))
-        (( (values.runtime.secret != "" ) ? "token /etc/coredns/token /etc/coredns/ca.crt" :"" ))
+        (( (values.runtime.secret != "" ) ? "token /etc/coredns/access/token /etc/coredns/access/ca.crt" :"" ))
         ttl 30
       }
     }

@@ -23,6 +23,7 @@ import (
 
 	"github.com/mandelsoft/kubedns/pkg/clusterutils"
 	"github.com/mandelsoft/kubedns/pkg/enqueue"
+	"github.com/mandelsoft/kubedns/pkg/index"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +36,8 @@ import (
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 )
 
+const INDEX_SASECFRET = "serviceaccount-secret"
+
 type Responsibility struct {
 	Root    *corednsv1alpha1.HostedZone
 	Runtime string
@@ -43,6 +46,7 @@ type Responsibility struct {
 
 // HostedZoneReconciler reconciles a HostedZone object
 type HostedZoneReconciler struct {
+	logging.Logger
 	Mode         Mode
 	Finalizer    string
 	FieldManager string
@@ -56,6 +60,8 @@ type HostedZoneReconciler struct {
 	Runtime      clusterutils.Cluster
 	runtimeOwner owner.OwnerHandler
 	dns          DNSHandler
+
+	index index.UntypedIndex
 }
 
 // +kubebuilder:rbac:groups=core,resources=secrets;configmaps;serviceaccounts,verbs=get;list;watch;create;update;patch;delete
@@ -94,9 +100,9 @@ func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// anonymous validation for responsibility fields
 		if !IsASCIIAlnumString(String(obj.Spec.Runtime, "")) || !IsASCIIAlnumString(String(obj.Spec.Class, "")) {
 			mod, err := r.UpdateCondition(ctx, logger, obj, metav1.Condition{
-				Type:               ValidationConditionType,
+				Type:               corednsv1alpha1.ValidationConditionType,
 				Status:             metav1.ConditionFalse, // Use metav1 constant
-				Reason:             ReasonInvalidParent,
+				Reason:             corednsv1alpha1.ReasonInvalidParent,
 				Message:            "class and runtime must use ASCII alphanumeric characters, only.",
 				ObservedGeneration: obj.Generation,
 			})

@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,6 +25,14 @@ type Mode interface {
 
 type ModeImpl struct {
 	*HostedZoneReconciler
+}
+
+func (m *ModeImpl) Cleanup(ctx ReconcileContext, name string) error {
+	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
+	if !ctx.Simulate {
+		m.index.Delete(INDEX_SASECFRET, ctx.ObjectKey, key)
+	}
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -52,15 +59,15 @@ func (m *LocalMode) RuntimeDeploymentName(key client.ObjectKey) string {
 	return fmt.Sprintf("%s-%s", BASE, key.Name)
 }
 
-func (m *LocalMode) AccessValues(ReconcileContext, string) (map[string]interface{}, error) {
+func (m *LocalMode) AccessValues(ctx ReconcileContext, name string) (map[string]interface{}, error) {
+	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
+	if !ctx.Simulate {
+		m.index.Delete(INDEX_SASECFRET, ctx.ObjectKey, key)
+	}
 	return nil, nil
 }
 
 func (m *LocalMode) Prepare(ctx ReconcileContext) error {
-	return nil
-}
-
-func (r *LocalMode) Cleanup(ctx ReconcileContext, name string) error {
 	return nil
 }
 
@@ -106,9 +113,14 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string) (map[strin
 			"ca.crt": []byte(base64.StdEncoding.EncodeToString([]byte("server-ca-cert"))),
 		}
 	} else {
-		err := m.DataPlane.Get(ctx, client.ObjectKey{Namespace: ctx.Namespace, Name: name}, &secret)
+		key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
+		if !ctx.Simulate {
+			m.index.Add(INDEX_SASECFRET, ctx.ObjectKey, key)
+		}
+		err := m.DataPlane.Get(ctx, key, &secret)
 		if err != nil {
 			if errors.IsNotFound(err) {
+				ctx.Info("creating serviceaccount secret {{secret}}", "secret", key)
 				secret.Name = name
 				secret.Namespace = ctx.Namespace
 				secret.Type = v1.SecretTypeServiceAccountToken
@@ -158,9 +170,17 @@ func (m *RuntimeMode) Prepare(ctx ReconcileContext) error {
 }
 
 func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) error {
+	if err := m.ModeImpl.Cleanup(ctx, name); err != nil {
+		return err
+	}
+
+	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
+	if len(m.index.GetUsers(INDEX_SASECFRET, key)) != 0 {
+		return nil
+	}
 
 	var secret v1.Secret
-	err := m.DataPlane.Get(ctx, client.ObjectKey{Namespace: ctx.Namespace, Name: name}, &secret)
+	err := m.DataPlane.Get(ctx, key, &secret)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
@@ -191,19 +211,7 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) error {
 		if len(ns.Finalizers) > 0 {
 			return nil
 		}
-		var list corednsv1alpha1.HostedZoneList
-		// try to delete dedicated namespace
-		err = m.DataPlane.List(ctx, &list, &client.ListOptions{Namespace: namespace})
-		if err != nil {
-			if errors.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-		if len(list.Items) > 1 {
-			// TODO: could delete temp namespace, but what about race conditions.
-			// there is no undelete if deletion timestamp is already set.
-		}
+
 	}
 	return err
 }

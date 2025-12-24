@@ -1,3 +1,13 @@
+helper:
+  <<<: (( &temporary ))
+  iaas:
+    aws:
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "external"
+        service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "instance"
+        service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+      loadBalancerClass: service.k8s.aws/nlb
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,9 +17,11 @@ metadata:
   labels:
     target: runtime
     app: (( values.runtime.label ))
+  annotations: (( helper.iaas[values.runtime.iaas].annotations || ~~ ))
+
 spec:
-  # Use ClusterIP for internal DNS resolution within the cluster
-  type: ClusterIP
+  type: LoadBalancer
+  loadBalancerClass: (( helper.iaas[values.runtime.iaas].loadBalancerClass || ~~ ))
 
   # Selects the pods created by the Deployment
   selector:

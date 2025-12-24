@@ -125,8 +125,8 @@ type HostedZoneStatus struct {
 // +kubebuilder:storageversion
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Namespaced,shortName=chz,path=hostedzones,singular=hostedzone
-// +kubebuilder:printcolumn:name=Domain,JSONPath=".spec.domainName",type=string
+// +kubebuilder:resource:scope=Namespaced,shortName=chz,path=hostedzones,singular=hostedzone,categories=dns
+// +kubebuilder:printcolumn:name=Domain,JSONPath=".spec.domainNames",type=string
 // +kubebuilder:printcolumn:name=Parent,JSONPath=".spec.parentRef",type=string
 // +kubebuilder:printcolumn:name=EMail,JSONPath=".spec.email",type=string
 // +kubebuilder:printcolumn:name=NameServer,JSONPath=".status.nameServers",type=string

@@ -1,4 +1,4 @@
-package hostedzone
+package v1alpha1
 
 const ValidationConditionType = "Validation"
 const ReasonConfigurarationWarning = "ConfigurarationWarning"
@@ -21,6 +21,12 @@ const ReasonUpdateFailed = "UpdateFailed"
 const ReasonRuntimeUnavailable = "RuntimeUnavailable"
 const ReasonRuntimeDeploying = "RuntimeDeploying"
 const ReasonRuntimeAvailable = "RuntimeAvailable"
+
+////////////////////////////////////////////////////////////////////////////////
+
+const ServerConditionType = "DNSServer"
+const ReasonServerActive = "HostedZoneActive"
+const ReasonServerValidationFailure = "ValidationFailed"
 
 ////////////////////////////////////////////////////////////////////////////////
 

@@ -19,7 +19,7 @@ type Options struct {
 	ProbeAddr            string
 	ElectionId           string
 
-	defaultElectionId    string
+	defaultElectionId string
 
 	// Configurations describes a sequence of ConfigurationProvider.
 	// They are used to finalize the manager options before
@@ -39,7 +39,7 @@ var (
 	_ flagutils.OptionSet   = (*Options)(nil) // forward kubeconfig options as nested set
 )
 
-func New(kube *kubeconfigopts.Options, scheme *runtime.Scheme, electionId string, configs...ConfigurationProvider) *Options {
+func New(kube *kubeconfigopts.Options, scheme *runtime.Scheme, electionId string, configs ...ConfigurationProvider) *Options {
 	nested := flagutils.DefaultOptionSet{}
 	if kube == nil {
 		kube = kubeconfigopts.New("standard kubeconfig")
@@ -50,6 +50,10 @@ func New(kube *kubeconfigopts.Options, scheme *runtime.Scheme, electionId string
 }
 
 func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
+	err := flagutils.Validate(ctx, o.Nested, v)
+	if err != nil {
+		return err
+	}
 	metrics, err := flagutils.ValidatedOptions[*metricsopts.Options](ctx, opts, v)
 	if err != nil {
 		return err
@@ -118,6 +122,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.EnableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	o.Nested.AddFlags(fs)
 }
 
 // AsOptionSet provides access o the netsed option set.

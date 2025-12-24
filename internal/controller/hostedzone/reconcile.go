@@ -8,7 +8,7 @@ import (
 	"reflect"
 
 	"github.com/go-test/deep"
-	corev1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
+	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/pkg/clusterutils"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/kubedns/pkg/render"
@@ -29,15 +29,15 @@ const GENERATED = "!!! DO NOT CHANGE MANUALLY, THIS OBJECT IS AUTOMATICALLY GENE
 type ReconcileRequest struct {
 	ReconcileContext
 	reconciler *HostedZoneReconciler
-	instance   *corev1alpha1.HostedZone
-	orig       *corev1alpha1.HostedZone
+	instance   *corednsv1alpha1.HostedZone
+	orig       *corednsv1alpha1.HostedZone
 }
 
 var _ clusterutils.OperationContext = (*ReconcileRequest)(nil)
 
-func NewRequest(ctx context.Context, l logging.Logger, reconciler *HostedZoneReconciler, key client.ObjectKey, instance *corev1alpha1.HostedZone) *ReconcileRequest {
+func NewRequest(ctx context.Context, l logging.Logger, reconciler *HostedZoneReconciler, key client.ObjectKey, instance *corednsv1alpha1.HostedZone) *ReconcileRequest {
 	return &ReconcileRequest{
-		ReconcileContext: NewReconcileContext(ctx, l, reconciler.DataPlaneURL, key),
+		ReconcileContext: NewReconcileContext(ctx, l, reconciler.DataPlaneURL, reconciler.Options.IaaS, key),
 		reconciler:       reconciler,
 		orig:             instance,
 		instance:         instance.DeepCopy(),
@@ -165,9 +165,9 @@ func (r *ReconcileRequest) IsResponsibileFor() (bool, *Responsibility, error) {
 			// dangling object, always report problem
 			r.Info("report dangling zone", "error", err.Error())
 			r.SetStatusCondition(metav1.Condition{
-				Type:    ValidationConditionType,
+				Type:    corednsv1alpha1.ValidationConditionType,
 				Status:  metav1.ConditionFalse, // Use metav1 constant
-				Reason:  ReasonInvalidParent,
+				Reason:  corednsv1alpha1.ReasonInvalidParent,
 				Message: err.Error(),
 			})
 			err = nil
@@ -191,7 +191,7 @@ func (r *ReconcileRequest) handleObject(root *Responsibility) error {
 	if err != nil {
 		if reason != "" {
 			r.SetStatusCondition(metav1.Condition{
-				Type:    ValidationConditionType,
+				Type:    corednsv1alpha1.ValidationConditionType,
 				Status:  metav1.ConditionFalse, // Use metav1 constant
 				Reason:  reason,
 				Message: err.Error(),
@@ -200,12 +200,12 @@ func (r *ReconcileRequest) handleObject(root *Responsibility) error {
 		return err
 	}
 
-	var observed *corev1alpha1.Observed
+	var observed *corednsv1alpha1.Observed
 	if r.instance.Spec.ParentRef == "" {
 		observed = r.instance.Status.Observed
 		if observed == nil {
 			r.Logger.Info("registering responsibility")
-			observed = &corev1alpha1.Observed{
+			observed = &corednsv1alpha1.Observed{
 				Runtime: r.reconciler.Options.Runtime,
 				Class:   r.reconciler.Options.Class,
 			}
@@ -215,7 +215,7 @@ func (r *ReconcileRequest) handleObject(root *Responsibility) error {
 	r.Logger.Info("validation succeeded")
 	// --- Validation Succeeded: Use meta.SetStatusCondition to set ConditionTrue ---
 	r.SetStatusCondition(metav1.Condition{
-		Type:    ValidationConditionType,
+		Type:    corednsv1alpha1.ValidationConditionType,
 		Status:  metav1.ConditionTrue,
 		Reason:  reason,
 		Message: "The HostedZone specification passed all validation checks.",
@@ -225,7 +225,7 @@ func (r *ReconcileRequest) handleObject(root *Responsibility) error {
 	if r.instance.Spec.ParentRef != "" {
 		// update status from root
 		for _, c := range root.Root.Status.Conditions {
-			if c.Type != ValidationConditionType {
+			if c.Type != corednsv1alpha1.ValidationConditionType {
 				r.SetStatusCondition(metav1.Condition{
 					Type:    c.Type,
 					Status:  c.Status,
@@ -265,8 +265,9 @@ func (r *ReconcileRequest) ApplyData(octx clusterutils.OperationContext, data []
 	o, err := clusterutils.ClientSideApply(r.reconciler.Runtime, octx, data)
 	if err != nil {
 		meta.SetStatusCondition(&r.instance.Status.Conditions, metav1.Condition{
-			Type:    RuntimeConditionType,
-			Reason:  ReasonUpdateFailed,
+			Type:    corednsv1alpha1.RuntimeConditionType,
+			Reason:  corednsv1alpha1.ReasonUpdateFailed,
+			Status:  metav1.ConditionFalse,
 			Message: fmt.Sprintf("%s: %s", client.ObjectKeyFromObject(o), err.Error()),
 		})
 		return o, err
@@ -283,6 +284,9 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 
 	values, repeat := r.Values(r.reconciler.Mode)
 
+	if repeat != nil {
+		r.Info("valzues not yet complete: {{reason}}", "reason", repeat.Error())
+	}
 	// even if access for credentials has been failed, the dataplane is applied.
 	// this may create a secret required to get the access token.
 
@@ -302,7 +306,7 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 	// if credential access failed, retry the reconcilation
 	if repeat != nil {
 		r.Info("dataplane still pending: {{reason}} -> requeue", "reason", repeat.Error())
-		return repeat
+		return nil // tre-rigger by watch
 	}
 
 	if true {
@@ -342,8 +346,9 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 					if !errors.IsNotFound(err) {
 						err = fmt.Errorf("failing to read service %q; %w", client.ObjectKeyFromObject(o), err)
 						meta.SetStatusCondition(&r.instance.Status.Conditions, metav1.Condition{
-							Type:               RuntimeConditionType,
-							Reason:             ReasonUpdateFailed,
+							Type:               corednsv1alpha1.RuntimeConditionType,
+							Reason:             corednsv1alpha1.ReasonUpdateFailed,
+							Status:             metav1.ConditionFalse,
 							Message:            err.Error(),
 							ObservedGeneration: r.instance.Generation,
 						})
@@ -364,32 +369,30 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 		var sum error
 		var deployment appsv1.Deployment
 
-		ready := false
 		if err := r.reconciler.Runtime.Get(r, deplName, &deployment); err == nil {
 			ok, err := isDeploymentReady(&deployment)
 			r.Info("deployment state", "deployment", deplName, "ready", ok, "error", err)
 			msg := "Deployment serving requests"
-			reason := ReasonRuntimeAvailable
+			reason := corednsv1alpha1.ReasonRuntimeAvailable
 			if !ok {
-				reason = ReasonRuntimeUnavailable
+				reason = corednsv1alpha1.ReasonRuntimeUnavailable
 			}
-			ready = true
 			if err != nil {
 				msg = err.Error()
 				if ok {
-					reason = ReasonRuntimeDeploying
+					reason = corednsv1alpha1.ReasonRuntimeDeploying
 				}
 			}
 			r.SetStatusCondition(metav1.Condition{
-				Type:    RuntimeConditionType,
+				Type:    corednsv1alpha1.RuntimeConditionType,
 				Reason:  reason,
 				Message: msg,
 				Status:  ConditionStatus(ok),
 			})
 		} else {
 			r.SetStatusCondition(metav1.Condition{
-				Type:    RuntimeConditionType,
-				Reason:  ReasonRuntimeUnavailable,
+				Type:    corednsv1alpha1.RuntimeConditionType,
+				Reason:  corednsv1alpha1.ReasonRuntimeUnavailable,
 				Message: err.Error(),
 				Status:  metav1.ConditionFalse,
 			})
@@ -399,41 +402,68 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 		if dnsctx.Service != nil {
 			cnames, err := r.reconciler.Options.DNSHandler.GetCNames(&dnsctx)
 			r.Info("cnames state", "service", svcName, "cnames", cnames, "error", err)
-			reason := ReasonNameserverPending
+			reason := corednsv1alpha1.ReasonNameserverPending
 			msg := "waiting for external access to be provisioned"
+			ok := false
 			if err != nil {
 				msg = err.Error()
-			}
-			ok := false
-			r.instance.Status.NameServers = nil
-			if !ready {
-				reason = ReasonRuntimeUnavailable
-				msg = "runtime not available"
 			} else {
 				if len(cnames) > 0 {
-					reason = ReasonNameserverAvailable
-					msg = "nameservers ready"
-					ok = true
-
 					r.instance.Status.NameServers = cnames
+					reason = corednsv1alpha1.ReasonNameserverAvailable
+					msg = "nameserver access ready"
+					ok = true
+				} else {
+					msg = "nameserver access still pending"
 				}
 			}
 			r.SetStatusCondition(metav1.Condition{
-				Type:    NameserverConditionType,
+				Type:    corednsv1alpha1.NameserverConditionType,
 				Reason:  reason,
 				Message: msg,
 				Status:  ConditionStatus(ok),
 			})
 		} else {
 			r.SetStatusCondition(metav1.Condition{
-				Type:    NameserverConditionType,
-				Reason:  ReasonRuntimeUnavailable,
+				Type:    corednsv1alpha1.NameserverConditionType,
+				Reason:  corednsv1alpha1.ReasonRuntimeUnavailable,
 				Message: "no Service for DNS server found",
 				Status:  metav1.ConditionFalse,
 			})
 			sum = errors2.Join(sum, err)
 		}
 
+		// calculate status summary.
+
+		status := "Failed"
+		msg := "status unknown"
+		c := meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.ValidationConditionType)
+		if c != nil {
+			msg = c.Message
+			if c.Status == metav1.ConditionTrue {
+				c = meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.RuntimeConditionType)
+				if c != nil {
+					msg = c.Message
+					if c.Status == metav1.ConditionTrue {
+						c = meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.NameserverConditionType)
+						if c != nil {
+							msg = c.Message
+							if c.Status == metav1.ConditionTrue {
+								c = meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.ServerConditionType)
+								if c != nil {
+									msg = c.Message
+									if c.Status == metav1.ConditionTrue {
+										status = "Ready"
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		r.instance.Status.Message = msg
+		r.instance.Status.State = status
 		return sum
 
 	} else {
