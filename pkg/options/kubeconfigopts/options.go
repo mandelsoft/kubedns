@@ -17,8 +17,8 @@ type Options struct {
 
 	KubeConfig string
 	Context    string
-	FallBack *Options
-	Config *rest.Config
+	FallBack   *Options
+	Config     *rest.Config
 }
 
 func From(opts flagutils.OptionSetProvider) *Options {

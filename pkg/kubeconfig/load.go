@@ -18,7 +18,7 @@ func GetConfig(path string, context string) (*rest.Config, error) {
 		return rest.InClusterConfig()
 	}
 
-	rules:=clientcmd.NewDefaultClientConfigLoadingRules()
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	rules.ExplicitPath = path
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		rules,

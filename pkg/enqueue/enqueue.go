@@ -21,7 +21,7 @@ type enqueue struct {
 	queues []workqueue.TypedRateLimitingInterface[reconcile.Request]
 }
 
-var _ Enqueue= (*enqueue)(nil)
+var _ Enqueue = (*enqueue)(nil)
 
 func NewEnqueue() Enqueue {
 	return &enqueue{}

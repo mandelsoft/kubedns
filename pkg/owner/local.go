@@ -17,7 +17,8 @@ func LocalOwner(scheme *runtime.Scheme) OwnerHandler {
 
 func (l *local) GetOwner(obj client.Object, kind schema.GroupKind) *client.ObjectKey {
 	for _, r := range obj.GetOwnerReferences() {
-		if r.Kind == kind.Kind {}
+		if r.Kind == kind.Kind {
+		}
 		gv, _ := schema.ParseGroupVersion(r.APIVersion)
 		if gv.Group == kind.Group {
 			return &client.ObjectKey{Name: r.Name, Namespace: obj.GetNamespace()}
@@ -26,6 +27,6 @@ func (l *local) GetOwner(obj client.Object, kind schema.GroupKind) *client.Objec
 	return nil
 }
 
-func (l *local)	SetOwner(owner client.Object, obj client.Object) error {
+func (l *local) SetOwner(owner client.Object, obj client.Object) error {
 	return controllerutil.SetControllerReference(owner, obj, l.scheme)
 }

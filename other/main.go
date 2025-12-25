@@ -69,7 +69,7 @@ func main() {
 	}
 
 	serviceAccountToken := tokenResult.Status.Token
-	fmt.Println("Successfully retrieved Service Account Token: %s", serviceAccountToken)
+	fmt.Printf("Successfully retrieved Service Account Token: %s\n", serviceAccountToken)
 	// fmt.Printf("Token (JWT): %s\n", serviceAccountToken) // Uncomment to see the token itself
 
 	// 3. Determine the OIDC Issuer URL

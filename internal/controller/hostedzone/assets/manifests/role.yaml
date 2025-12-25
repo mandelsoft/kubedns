@@ -9,6 +9,6 @@ metadata:
 rules:
   # Granting FULL access to common networking and discovery resources
   - apiGroups: ["coredns.mandelsoft.org"] # Core API Group
-    resources: ["HostedZones", "CoreDNSEntries"]
+    resources: ["hostedzones", "corednsentries", "hostedzones/status", "corednsentries/status"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
     # A simpler way to grant all verbs is ["*"]

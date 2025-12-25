@@ -132,7 +132,7 @@ func (in *HostedZoneStatus) DeepCopyInto(out *HostedZoneStatus) {
 	if in.Observed != nil {
 		in, out := &in.Observed, &out.Observed
 		*out = new(Observed)
-		(*in).DeepCopyInto(*out)
+		**out = **in
 	}
 }
 

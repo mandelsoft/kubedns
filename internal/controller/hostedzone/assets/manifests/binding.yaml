@@ -13,4 +13,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: (( values.dataplane.name ))
-    namespace: default
+    namespace: (( values.dataplane.namespace ))

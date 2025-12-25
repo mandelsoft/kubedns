@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func Setup(options flagutils.OptionSet, args ... string)  {
+func Setup(options flagutils.OptionSet, args ...string) {
 	fs := &pflag.FlagSet{}
 	options.AddFlags(fs)
 	err := fs.Parse(args)
