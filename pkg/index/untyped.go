@@ -1,7 +1,6 @@
 package index
 
 import (
-	"maps"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -9,111 +8,85 @@ import (
 )
 
 type UntypedIndex interface {
+	Replace(r string, a client.ObjectKey, b ...client.ObjectKey) bool
 	Add(r string, a, b client.ObjectKey) bool
-	Delete(r string, a, b client.ObjectKey) bool
-	DeleteObject(o client.ObjectKey)
-	GetUsers(r string, b client.ObjectKey) sets.Set[client.ObjectKey]
+	Remove(r string, a, b client.ObjectKey) bool
+	RemoveObject(o client.ObjectKey) bool
+	UsersFor(r string, b client.ObjectKey) sets.Set[client.ObjectKey]
+	UsedBy(r string, a client.ObjectKey) sets.Set[client.ObjectKey]
 	Clear(r string) bool
 }
 
 type untyped struct {
-	lock  sync.Mutex
-	index map[string]map[client.ObjectKey]sets.Set[client.ObjectKey]
+	lock      sync.Mutex
+	relations map[string]*relation
 }
 
 func NewUntyped() UntypedIndex {
-	return &untyped{index: make(map[string]map[client.ObjectKey]sets.Set[client.ObjectKey])}
+	return &untyped{
+		relations: make(map[string]*relation),
+	}
 }
 
 func (u *untyped) Add(r string, a, b client.ObjectKey) bool {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
-	rel := u.getRelation(r)
-
-	t := rel[b]
-	if t == nil {
-		t = make(sets.Set[client.ObjectKey], 0)
-		rel[b] = t
-	}
-	if t.Has(a) {
-		return false
-	}
-	t.Insert(a)
-	return true
+	return u.getRelation(r).Add(a, b)
 }
 
-func (u *untyped) Delete(r string, a, b client.ObjectKey) bool {
+func (u *untyped) Replace(r string, a client.ObjectKey, b ...client.ObjectKey) bool {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
-	rel := u.index[r]
-	if rel == nil {
-		return false
-	}
-
-	t := rel[b]
-	if t == nil {
-		return false
-	}
-	if t.Has(a) {
-		t.Delete(a)
-		return true
-	}
-	return false
+	return u.getRelation(r).Replace(a, b...)
 }
 
-func (u *untyped) DeleteObject(o client.ObjectKey) {
+func (u *untyped) Remove(r string, a, b client.ObjectKey) bool {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
-	for r, rel := range u.index {
-		delete(rel, o)
-		if len(rel) == 0 {
-			delete(u.index, r)
-			continue
-		}
-		for b, t := range rel {
-			t.Delete(o)
-			if len(t) == 0 {
-				delete(rel, b)
-			}
-		}
-	}
+	return u.relations[r].Remove(a, b)
 }
 
-func (u *untyped) GetUsers(r string, b client.ObjectKey) sets.Set[client.ObjectKey] {
+func (u *untyped) RemoveObject(o client.ObjectKey) bool {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
-	rel := u.index[r]
-	if rel == nil {
-		return nil
+	ok := false
+	for _, rel := range u.relations {
+		ok = rel.RemoveObject(o) || ok
 	}
+	return ok
+}
 
-	t := rel[b]
-	if t == nil {
-		return nil
-	}
-	return maps.Clone(t)
+func (u *untyped) UsedBy(r string, a client.ObjectKey) sets.Set[client.ObjectKey] {
+	u.lock.Lock()
+	defer u.lock.Unlock()
+
+	return u.relations[r].UsedBy(a)
+}
+
+func (u *untyped) UsersFor(r string, b client.ObjectKey) sets.Set[client.ObjectKey] {
+	u.lock.Lock()
+	defer u.lock.Unlock()
+
+	return u.relations[r].UsersFor(b)
+
 }
 
 func (u *untyped) Clear(r string) bool {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
-	if u.index[r] == nil {
-		return false
-	}
-	delete(u.index, r)
-	return true
+	return u.relations[r].Clear()
 }
 
-func (u *untyped) getRelation(r string) map[client.ObjectKey]sets.Set[client.ObjectKey] {
-	rel := u.index[r]
+func (u *untyped) getRelation(r string) *relation {
+	rel := u.relations[r]
 	if rel == nil {
-		rel = make(map[client.ObjectKey]sets.Set[client.ObjectKey])
-		u.index[r] = rel
+		rel = newRelation()
+		u.relations[r] = rel
 	}
 	return rel
 }

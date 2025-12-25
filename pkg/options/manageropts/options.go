@@ -14,10 +14,11 @@ import (
 )
 
 type Options struct {
-	Nested               flagutils.OptionSet
-	EnableLeaderElection bool
-	ProbeAddr            string
-	ElectionId           string
+	Nested                  flagutils.OptionSet
+	EnableLeaderElection    bool
+	LeaderElectionNamespace string
+	ProbeAddr               string
+	ElectionId              string
 
 	defaultElectionId string
 
@@ -75,12 +76,13 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 	}
 
 	cfg := ctrl.Options{
-		Scheme:                 o.Scheme,
-		Metrics:                metrics.GetMetricsServerOpts(),
-		WebhookServer:          web.GetServer(),
-		HealthProbeBindAddress: o.ProbeAddr,
-		LeaderElection:         o.EnableLeaderElection,
-		LeaderElectionID:       o.defaultElectionId,
+		Scheme:                  o.Scheme,
+		Metrics:                 metrics.GetMetricsServerOpts(),
+		WebhookServer:           web.GetServer(),
+		HealthProbeBindAddress:  o.ProbeAddr,
+		LeaderElection:          o.EnableLeaderElection,
+		LeaderElectionNamespace: o.LeaderElectionNamespace,
+		LeaderElectionID:        o.defaultElectionId,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -119,6 +121,7 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.ElectionId, "leader-election-id", o.ElectionId, "Id for leader election")
 	fs.StringVar(&o.ProbeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	fs.StringVar(&o.LeaderElectionNamespace, "leader-elect-namespace", "", "leader election namespace")
 	fs.BoolVar(&o.EnableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")

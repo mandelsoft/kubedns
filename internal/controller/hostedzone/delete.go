@@ -16,11 +16,11 @@ func (r *ReconcileRequest) DeleteExternalResources() error {
 	}
 
 	for _, data := range runtime {
-		err = errors.Join(err, r.Delete("runtime", r.reconciler.Runtime, data))
+		err = errors.Join(err, r.Delete(r.reconciler.Runtime, data))
 	}
 
 	for _, data := range dataplane {
-		err = errors.Join(err, r.Delete("dataplane", r.reconciler.DataPlane, data))
+		err = errors.Join(err, r.Delete(r.reconciler.DataPlane, data))
 	}
 
 	if err == nil {

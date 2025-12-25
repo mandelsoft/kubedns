@@ -46,11 +46,12 @@ func (r *HostedZoneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	r.Finalizer = r.FieldManager
 
-	r.Info("for Class", "class", r.Options.Class)
-	r.Info("for Runtime", "runtime", r.Options.Runtime)
-	r.Info("using FieldManger", "fieldmanager", r.FieldManager)
-	r.Info("using Finalizer", "finalizer", r.Finalizer)
-	r.Info("using Nameserver mode", "mode", r.Options.DNSMode)
+	r.Info("for Class '{{class}}'", "class", r.Options.Class)
+	r.Info("for Runtime '{{runtime}}'", "runtime", r.Options.Runtime)
+	r.Info("for Platform mode '{{platform}}'", "platform", r.Options.Platform)
+	r.Info("using FieldManger '{{fieldmanager}}'", "fieldmanager", r.FieldManager)
+	r.Info("using Finalizer '{{finalizer}}'", "finalizer", r.Finalizer)
+	r.Info("using Nameserver mode '{{mode}}'", "mode", r.Options.DNSMode)
 
 	u, _, err := rest.DefaultServerUrlFor(mgr.GetConfig())
 	if err != nil {
@@ -127,7 +128,7 @@ func (r *HostedZoneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 				var trigger []reconcile.Request
 				key := client.ObjectKeyFromObject(obj)
-				users := r.index.GetUsers(INDEX_SASECFRET, key)
+				users := r.index.UsersFor(INDEX_SASECFRET, key)
 				if len(users) > 0 {
 					log.Info("change of service account secret {{secret}} triggers {{amount}} zones",
 						"secret", key,

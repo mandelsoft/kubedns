@@ -83,7 +83,7 @@ func (c *_cluster) GetName() string {
 }
 
 func (c *_cluster) GetEffective() Cluster {
-	return c
+	return c.GetEffective()
 }
 
 func (c *_cluster) GetCluster() cluster.Cluster {

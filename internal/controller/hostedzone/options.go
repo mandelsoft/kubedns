@@ -20,7 +20,7 @@ type Options struct {
 	DNSNamespace     string
 	DNSMode          string
 	RuntimeNamespace string
-	IaaS             string
+	Platform         string
 
 	RuntimeConfig *kubeconfigopts.Options
 
@@ -64,7 +64,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&o.DNSMode, "ns-mode", "", "loadbalancer", "DNS mode for providing nameserver cnames")
 	fs.StringVarP(&o.DNSDomain, "ns-domain", "", "", "DNS domain for managed nameserver DNS names")
 	fs.StringVarP(&o.DNSNamespace, "ns-namespace", "", "", "namespace used to request nameserver DNS names")
-	fs.StringVarP(&o.IaaS, "iaas", "", "default", "IaaS layer to use (special support so far for \"aws\"")
+	fs.StringVarP(&o.Platform, "iaas", "", "default", "IaaS layer to use (special support so far for \"aws\"")
 }
 
 func (o *Options) Configure(ctx context.Context, cfg *ctrl.Options, opts flagutils.OptionSet, v flagutils.ValidationSet) error {

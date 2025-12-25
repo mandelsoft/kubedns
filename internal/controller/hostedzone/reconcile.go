@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 
 	"github.com/go-test/deep"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
@@ -37,7 +38,7 @@ var _ clusterutils.OperationContext = (*ReconcileRequest)(nil)
 
 func NewRequest(ctx context.Context, l logging.Logger, reconciler *HostedZoneReconciler, key client.ObjectKey, instance *corednsv1alpha1.HostedZone) *ReconcileRequest {
 	return &ReconcileRequest{
-		ReconcileContext: NewReconcileContext(ctx, l, reconciler.DataPlaneURL, reconciler.Options.IaaS, key),
+		ReconcileContext: NewReconcileContext(ctx, l, reconciler.DataPlaneURL, reconciler.Options.Platform, key),
 		reconciler:       reconciler,
 		orig:             instance,
 		instance:         instance.DeepCopy(),
@@ -275,6 +276,10 @@ func (r *ReconcileRequest) ApplyData(octx clusterutils.OperationContext, data []
 	return o, err
 }
 
+func (r *ReconcileRequest) DeleteData(octx clusterutils.OperationContext, data []byte) error {
+	return r.Delete(r.reconciler.Runtime, data)
+}
+
 func (r *ReconcileRequest) HandleExternalResources() error {
 
 	err := r.reconciler.Mode.Prepare(r.ReconcileContext)
@@ -285,7 +290,7 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 	values, repeat := r.Values(r.reconciler.Mode)
 
 	if repeat != nil {
-		r.Info("valzues not yet complete: {{reason}}", "reason", repeat.Error())
+		r.Info("values not yet complete: {{reason}}", "reason", repeat.Error())
 	}
 	// even if access for credentials has been failed, the dataplane is applied.
 	// this may create a secret required to get the access token.
@@ -329,6 +334,9 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 		for _, data := range runtime {
 			o, err := r.ApplyData(octx, data)
 			if err != nil {
+				if checkNotModifiableError(err) {
+					r.DeleteData(octx, data)
+				}
 				return err
 			}
 			gvk := o.GetObjectKind().GroupVersionKind()
@@ -473,7 +481,7 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 	return nil
 }
 
-func (r *ReconcileRequest) Delete(target string, clt client.Client, manifest []byte) error {
+func (r *ReconcileRequest) Delete(cluster clusterutils.Cluster, manifest []byte) error {
 	obj := unstructured.Unstructured{}
 	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	_, _, err := dec.Decode(manifest, nil, &obj)
@@ -487,7 +495,7 @@ func (r *ReconcileRequest) Delete(target string, clt client.Client, manifest []b
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}
-	err = clt.Get(r, key, &current)
+	err = cluster.Get(r, key, &current)
 
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -498,8 +506,8 @@ func (r *ReconcileRequest) Delete(target string, clt client.Client, manifest []b
 	if !current.GetDeletionTimestamp().IsZero() {
 		return fmt.Errorf("resource %q is still being deleted", key)
 	}
-	r.Info("deleting object", "name", key.Name, "namespace", key.Namespace, "target", target, "groupkind", obj.GroupVersionKind())
-	err = clt.Delete(r, &obj)
+	r.Info("deleting object", "name", key.Name, "namespace", key.Namespace, "target", cluster.GetName(), "groupkind", obj.GroupVersionKind())
+	err = cluster.GetClient().Delete(r, &obj)
 	return err
 }
 
@@ -591,4 +599,16 @@ func isDeploymentReady(deploy *appsv1.Deployment) (bool, error) {
 		return true, err
 	}
 	return false, err
+}
+
+func checkNotModifiableError(err error) bool {
+	if err != nil && errors.IsInvalid(err) {
+		// This is a 422 Unprocessable Entity / Invalid error
+		if strings.Contains(err.Error(), "may not change once set") {
+			// Strategy: You likely need to delete and recreate the service
+			// if the LoadBalancer class actually needs to change.
+			return true
+		}
+	}
+	return false
 }

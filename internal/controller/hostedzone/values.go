@@ -15,13 +15,13 @@ type ReconcileContext struct {
 	context.Context
 	client.ObjectKey
 	DataPlaneURL string
-	IaaS         string
+	Platform     string
 
 	Simulate bool
 }
 
-func NewReconcileContext(ctx context.Context, log logging.Logger, server string, iaas string, key client.ObjectKey) ReconcileContext {
-	return ReconcileContext{Logger: log, Context: ctx, ObjectKey: key, DataPlaneURL: server, IaaS: iaas}
+func NewReconcileContext(ctx context.Context, log logging.Logger, server string, platform string, key client.ObjectKey) ReconcileContext {
+	return ReconcileContext{Logger: log, Context: ctx, ObjectKey: key, DataPlaneURL: server, Platform: platform}
 }
 
 func (r *ReconcileContext) Values(m Mode) (map[string]interface{}, error) {
@@ -43,7 +43,7 @@ func (r *ReconcileContext) Values(m Mode) (map[string]interface{}, error) {
 			"zone":      r.Name,
 		},
 		"runtime": map[string]interface{}{
-			"platform":  r.IaaS,
+			"platform":  r.Platform,
 			"namespace": m.RuntimeNamespace(r.ObjectKey),
 			"secret": map[string]interface{}{
 				"name": m.RuntimeSecretName(r.ObjectKey),

@@ -17,11 +17,11 @@ metadata:
   labels:
     target: runtime
     app: (( values.runtime.label ))
-  annotations: (( helper.iaas[values.runtime.iaas].annotations || ~~ ))
+  annotations: (( helper.iaas[values.runtime.platform].annotations || ~~ ))
 
 spec:
   type: LoadBalancer
-  loadBalancerClass: (( helper.iaas[values.runtime.iaas].loadBalancerClass || ~~ ))
+  loadBalancerClass: (( helper.iaas[values.runtime.platform].loadBalancerClass || ~~ ))
 
   # Selects the pods created by the Deployment
   selector:

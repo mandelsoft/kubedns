@@ -30,7 +30,7 @@ type ModeImpl struct {
 func (m *ModeImpl) Cleanup(ctx ReconcileContext, name string) error {
 	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
 	if !ctx.Simulate {
-		m.index.Delete(INDEX_SASECFRET, ctx.ObjectKey, key)
+		m.index.Remove(INDEX_SASECFRET, ctx.ObjectKey, key)
 	}
 	return nil
 }
@@ -62,7 +62,7 @@ func (m *LocalMode) RuntimeDeploymentName(key client.ObjectKey) string {
 func (m *LocalMode) AccessValues(ctx ReconcileContext, name string) (map[string]interface{}, error) {
 	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
 	if !ctx.Simulate {
-		m.index.Delete(INDEX_SASECFRET, ctx.ObjectKey, key)
+		m.index.Remove(INDEX_SASECFRET, ctx.ObjectKey, key)
 	}
 	return nil, nil
 }
@@ -175,7 +175,7 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) error {
 	}
 
 	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
-	if len(m.index.GetUsers(INDEX_SASECFRET, key)) != 0 {
+	if len(m.index.UsersFor(INDEX_SASECFRET, key)) != 0 {
 		return nil
 	}
 
