@@ -40,6 +40,7 @@ const INDEX_SASECFRET = "serviceaccount-secret"
 
 type Responsibility struct {
 	Root    *corednsv1alpha1.HostedZone
+	Parent  *corednsv1alpha1.HostedZone
 	Runtime string
 	Class   string
 }
@@ -121,10 +122,11 @@ func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger loggi
 }
 
 func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.Logger, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, error) {
-	var parent corednsv1alpha1.HostedZone
 	var path string
+	var directParent *corednsv1alpha1.HostedZone
 
 	for obj.Spec.ParentRef != "" {
+		var parent corednsv1alpha1.HostedZone
 		path = path + "/" + obj.Spec.ParentRef
 		logger.Info("handle parent", "parent", path)
 		err := r.DataPlane.Get(ctx, client.ObjectKey{obj.GetNamespace(), obj.Spec.ParentRef}, &parent)
@@ -137,9 +139,12 @@ func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.L
 		if !parent.GetDeletionTimestamp().IsZero() {
 			return nil, true, fmt.Errorf("parent %s deleted", obj.Spec.ParentRef)
 		}
+		if directParent == nil {
+			directParent = &parent
+		}
 		obj = &parent
 	}
-	return &Responsibility{Root: obj, Runtime: String(obj.Spec.Runtime, ""), Class: String(obj.Spec.Class, "")}, true, nil
+	return &Responsibility{Root: obj, Parent: directParent, Runtime: String(obj.Spec.Runtime, ""), Class: String(obj.Spec.Class, "")}, true, nil
 }
 
 func (r *HostedZoneReconciler) UpdateCondition(ctx context.Context, logger logging.Logger, instance *corednsv1alpha1.HostedZone, c metav1.Condition, mod ...bool) (bool, error) {

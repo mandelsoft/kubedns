@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func String(s *string, def string) string {
@@ -58,7 +60,7 @@ func IsASCIIAlnumString(s string) bool {
 	return true
 }
 
-func (r *ReconcileRequest) Validate() (string, error) {
+func (r *ReconcileRequest) Validate(root *Responsibility) (string, error) {
 	if len(r.instance.Spec.DomainNames) == 0 {
 		return v1alpha1.ReasonDomainNameMissing, fmt.Errorf("at one domain name required")
 	}
@@ -79,6 +81,16 @@ func (r *ReconcileRequest) Validate() (string, error) {
 		if r.instance.Spec.Class != nil {
 			return v1alpha1.ReasonInvalidNesting, fmt.Errorf("class set for nested zone")
 		}
+	}
+
+	if root.Parent != nil {
+		c := meta.FindStatusCondition(root.Parent.Status.Conditions, v1alpha1.ValidationConditionType)
+		if c != nil {
+			if c.Status != metav1.ConditionTrue {
+				return v1alpha1.ReasonInvalidParent, fmt.Errorf("%s: %s", root.Parent.Name, c.Message)
+			}
+		}
+
 	}
 	return v1alpha1.ReasonConfigurarationValid, nil
 }

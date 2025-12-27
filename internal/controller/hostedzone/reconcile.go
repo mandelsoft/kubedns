@@ -59,6 +59,7 @@ func (r *ReconcileRequest) Reconcile() error {
 		return err
 	}
 	r.Info("have to handle object")
+	r.Info("found status", "status", obj.Status)
 
 	if r.ChangedResponsibility() || !obj.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Handle Deletion
@@ -99,8 +100,8 @@ func (r *ReconcileRequest) Reconcile() error {
 	// handle finalizer
 	if obj.Spec.ParentRef != "" {
 		// Remove finalizer from slave and update
-		r.Info("removing finalizer for slave zone")
 		if controllerutil.RemoveFinalizer(obj, r.reconciler.Finalizer) {
+			r.Info("removing finalizer for slave zone")
 			if err := r.reconciler.DataPlane.Patch(r, obj, patch); err != nil {
 				return client.IgnoreNotFound(err)
 			}
@@ -156,8 +157,9 @@ func (r *ReconcileRequest) IsResponsibileFor() (bool, *Responsibility, error) {
 	if obj == nil {
 		return true, nil, nil
 	}
+	force := false
 	if controllerutil.ContainsFinalizer(obj, r.reconciler.Finalizer) {
-		return true, nil, nil
+		force = true
 	}
 	r.Info("lookup root")
 	info, ok, err := r.reconciler.GetRootInfo(r, r, obj)
@@ -175,6 +177,9 @@ func (r *ReconcileRequest) IsResponsibileFor() (bool, *Responsibility, error) {
 		}
 		return false, nil, err
 	}
+	if force {
+		return true, info, nil
+	}
 	new := info.Runtime == r.reconciler.Options.Runtime && info.Class == r.reconciler.Options.Class
 	r.Info("checking match", "root", info.Root.Name, "match", new, "runtime", info.Runtime, "class", info.Class)
 	if info.Root.Status.Observed == nil {
@@ -188,7 +193,7 @@ func (r *ReconcileRequest) IsResponsibileFor() (bool, *Responsibility, error) {
 }
 
 func (r *ReconcileRequest) handleObject(root *Responsibility) error {
-	reason, err := r.Validate()
+	reason, err := r.Validate(root)
 	if err != nil {
 		if reason != "" {
 			r.SetStatusCondition(metav1.Condition{
@@ -225,21 +230,7 @@ func (r *ReconcileRequest) handleObject(root *Responsibility) error {
 
 	if r.instance.Spec.ParentRef != "" {
 		// update status from root
-		for _, c := range root.Root.Status.Conditions {
-			if c.Type != corednsv1alpha1.ValidationConditionType {
-				r.SetStatusCondition(metav1.Condition{
-					Type:    c.Type,
-					Status:  c.Status,
-					Reason:  c.Reason,
-					Message: c.Message,
-				})
-			}
-		}
-		for _, c := range r.instance.Status.Conditions {
-			if meta.FindStatusCondition(root.Root.Status.Conditions, c.Type) != nil {
-				meta.RemoveStatusCondition(&r.instance.Status.Conditions, c.Type)
-			}
-		}
+		r.transferConditions(client.ObjectKeyFromObject(root.Root), root.Root.Status.Conditions)
 		return nil
 	}
 	return r.HandleExternalResources()
@@ -408,7 +399,11 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 		}
 
 		if dnsctx.Service != nil {
-			cnames, err := r.reconciler.Options.DNSHandler.GetCNames(&dnsctx)
+			cnames, err, repeat := r.reconciler.Options.DNSHandler.GetCNames(&dnsctx)
+			if repeat != nil && err == nil {
+				err = repeat
+			}
+			sum = errors2.Join(sum, repeat)
 			r.Info("cnames state", "service", svcName, "cnames", cnames, "error", err)
 			reason := corednsv1alpha1.ReasonNameserverPending
 			msg := "waiting for external access to be provisioned"
@@ -442,36 +437,7 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 		}
 
 		// calculate status summary.
-
-		status := "Failed"
-		msg := "status unknown"
-		c := meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.ValidationConditionType)
-		if c != nil {
-			msg = c.Message
-			if c.Status == metav1.ConditionTrue {
-				c = meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.RuntimeConditionType)
-				if c != nil {
-					msg = c.Message
-					if c.Status == metav1.ConditionTrue {
-						c = meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.NameserverConditionType)
-						if c != nil {
-							msg = c.Message
-							if c.Status == metav1.ConditionTrue {
-								c = meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.ServerConditionType)
-								if c != nil {
-									msg = c.Message
-									if c.Status == metav1.ConditionTrue {
-										status = "Ready"
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		r.instance.Status.Message = msg
-		r.instance.Status.State = status
+		r.summary()
 		return sum
 
 	} else {

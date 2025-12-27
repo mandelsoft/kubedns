@@ -3,6 +3,7 @@ package hostedzone
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/general"
@@ -16,6 +17,7 @@ import (
 type Options struct {
 	Runtime          string
 	Class            string
+	DNSClass         string
 	DNSDomain        string
 	DNSNamespace     string
 	DNSMode          string
@@ -44,25 +46,25 @@ func NewOptions(def ...*kubeconfigopts.Options) *Options {
 }
 
 func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
-	switch o.DNSMode {
-	case "loadbalancer":
-		o.DNSHandler = NewDNSByLoadBalancer()
-	// case "gardener":
-	// case "local":
-	default:
-		return fmt.Errorf("unsupported ns-mode %q", o.DNSMode)
+	var err error
+
+	o.DNSHandler, err = DNSModes.Create(ctx, o.DNSMode, o)
+	if err != nil {
+		return err
 	}
 	return o.RuntimeConfig.Validate(ctx, opts, v)
 }
 
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
+	modes := DNSModes.Names()
 	o.RuntimeConfig.AddFlags(fs)
 	fs.StringVarP(&o.RuntimeNamespace, "runtime-namespace", "", "", "use single runtime namespace for deployments")
 	fs.StringVarP(&o.Runtime, "runtime", "", "", "name of the runtime class to handle")
 	fs.StringVarP(&o.Class, "class", "", "", "name of the controller class to handle")
 
-	fs.StringVarP(&o.DNSMode, "ns-mode", "", "loadbalancer", "DNS mode for providing nameserver cnames")
-	fs.StringVarP(&o.DNSDomain, "ns-domain", "", "", "DNS domain for managed nameserver DNS names")
+	fs.StringVarP(&o.DNSMode, "dns-mode", "", "loadbalancer", fmt.Sprintf("DNS mode for providing nameserver cnames [%s]", strings.Join(modes, ",")))
+	fs.StringVarP(&o.DNSDomain, "dns-domain", "", "", "DNS domain for managed nameserver DNS names")
+	fs.StringVarP(&o.DNSClass, "dns-class", "", "", "DNS class for managed nameserver DNS names")
 	fs.StringVarP(&o.DNSNamespace, "ns-namespace", "", "", "namespace used to request nameserver DNS names")
 	fs.StringVarP(&o.Platform, "iaas", "", "default", "IaaS layer to use (special support so far for \"aws\"")
 }

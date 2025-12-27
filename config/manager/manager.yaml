@@ -68,6 +68,9 @@ spec:
           - --runtime-kubeconfig=in-cluster
           - --runtime-namespace=dns-runtime
           - --iaas=aws
+          - --dns-mode=gardener
+          - --dns-domain=dnsservice.dns-runtime.mandelsoft.shoot.canary.k8s-hana.ondemand.com
+          - --dns-class=garden
         image: mandelsoft/kubedns:latest
         imagePullPolicy: Always
         name: manager
