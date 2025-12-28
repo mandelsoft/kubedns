@@ -63,12 +63,19 @@ func (r *ReconcileRequest) summary() {
 									status = "Ready"
 								}
 							}
+						} else { // NameServer access
+							status = "Pending"
 						}
+					}
+				} else { // Runtime
+					if c.Reason == corednsv1alpha1.ReasonRuntimeDeploying {
+						status = "Pending"
 					}
 				}
 			}
 		}
 	}
+	r.Info("summaried status", "status", status, "message", msg)
 	r.instance.Status.Message = msg
 	r.instance.Status.State = status
 }

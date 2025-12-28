@@ -18,5 +18,5 @@ type DNSContext struct {
 type DNSHandler interface {
 	Manifests(ctx *DNSContext, values map[string]interface{}) [][]byte
 	Modify(ctx *DNSContext, obj client.Object) error
-	GetCNames(ctx *DNSContext) (cnames []string, err error, repeat error)
+	GetCNames(ctx *DNSContext) (cnames []string, err error)
 }

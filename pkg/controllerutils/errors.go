@@ -13,11 +13,14 @@ func (e requeueError) Unwrap() error {
 	return e.error
 }
 
+func RequestRequeuef(msg string, args ...interface{}) error {
+	return requeueError{fmt.Errorf(msg, args...)}
+}
+
 func RequestRequeue(err error) error {
 	if err == nil {
 		return nil
 	}
-	errors2.Unwrap(err)
 	return requeueError{err}
 }
 
@@ -36,6 +39,10 @@ func init() {
 	}
 
 	err = RequestRequeue(err)
+	if !RequeueRequested(err) {
+		panic("requeue type failed")
+	}
+	err = fmt.Errorf("wrapped: %w", err)
 	if !RequeueRequested(err) {
 		panic("requeue type failed")
 	}

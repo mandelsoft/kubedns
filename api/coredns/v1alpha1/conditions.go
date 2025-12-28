@@ -30,7 +30,7 @@ const ReasonServerValidationFailure = "ValidationFailed"
 
 ////////////////////////////////////////////////////////////////////////////////
 
-const NameserverConditionType = "Nameserver"
+const NameserverConditionType = "Nameserver" // Nameserver access
 
 const ReasonNameserverAvailable = "NameserverAvailable"
 const ReasonNameserverUnavailable = "NameserverUnavailable"

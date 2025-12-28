@@ -24,7 +24,7 @@ func NewReconcileContext(ctx context.Context, log logging.Logger, server string,
 	return ReconcileContext{Logger: log, Context: ctx, ObjectKey: key, DataPlaneURL: server, Platform: platform}
 }
 
-func (r *ReconcileContext) Values(m Mode) (map[string]interface{}, error) {
+func (r *ReconcileContext) Values(m Mode, deleting bool) (map[string]interface{}, error) {
 	accname := fmt.Sprintf("%s", BASE)
 	depname := m.RuntimeDeploymentName(r.ObjectKey)
 
@@ -53,7 +53,7 @@ func (r *ReconcileContext) Values(m Mode) (map[string]interface{}, error) {
 			"replicas": 1,
 		},
 	}
-	tmp, repeat := m.AccessValues(*r, accname)
+	tmp, repeat := m.AccessValues(*r, accname, deleting)
 	if repeat != nil {
 		r.Logger.Info("no access info -> must repeat")
 	}

@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: (( values.dataplane.name )) # Renamed the Role to reflect write access
+  name: (( values.dataplane.name ))
   namespace: (( values.dataplane.namespace ))
   labels:
     target: dataplane
@@ -9,6 +9,9 @@ metadata:
 rules:
   # Granting FULL access to common networking and discovery resources
   - apiGroups: ["coredns.mandelsoft.org"] # Core API Group
-    resources: ["hostedzones", "corednsentries", "hostedzones/status", "corednsentries/status"]
+    resources: ["hostedzones", "corednsentries"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["coredns.mandelsoft.org"] # Core API Group
+    resources: ["hostedzones/status", "corednsentries/status"]
+    verbs: ["get", "update", "patch"]
     # A simpler way to grant all verbs is ["*"]

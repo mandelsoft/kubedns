@@ -123,7 +123,7 @@ func (r *HostedZoneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	if r.IsSeparateRuntime() {
 		log := LoggingFor("sa-secretwatch")
-		r.Info("setiing up secret watch for serviceaccount secrets for separated runtime access")
+		r.Info("setting up secret watch for serviceaccount secrets for separated runtime access")
 		builder.Watches(&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 				var trigger []reconcile.Request

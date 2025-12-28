@@ -60,7 +60,7 @@ func TestRenderManifests() error {
 	r := &HostedZoneReconciler{
 		Options: NewOptions(nil),
 	}
-	values, err := ctx.Values(NewLocalMode(r))
+	values, err := ctx.Values(NewLocalMode(r), false)
 	if err != nil {
 		return fmt.Errorf("get local mode values: %w", err)
 	}
@@ -70,7 +70,7 @@ func TestRenderManifests() error {
 	}
 
 	r.Options.RuntimeNamespace = ""
-	values, err = ctx.Values(NewRuntimeMode(r))
+	values, err = ctx.Values(NewRuntimeMode(r), false)
 	if err != nil {
 		return fmt.Errorf("get runtime mode values: %w", err)
 	}
@@ -80,7 +80,7 @@ func TestRenderManifests() error {
 	}
 
 	r.Options.RuntimeNamespace = "dns-runtime"
-	values, err = ctx.Values(NewRuntimeMode(r))
+	values, err = ctx.Values(NewRuntimeMode(r), false)
 	if err != nil {
 		return fmt.Errorf("get central runtime mode values: %w", err)
 	}

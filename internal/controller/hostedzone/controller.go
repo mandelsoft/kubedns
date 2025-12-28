@@ -20,8 +20,10 @@ import (
 	"context"
 	errors2 "errors"
 	"fmt"
+	"time"
 
 	"github.com/mandelsoft/kubedns/pkg/clusterutils"
+	"github.com/mandelsoft/kubedns/pkg/controllerutils"
 	"github.com/mandelsoft/kubedns/pkg/enqueue"
 	"github.com/mandelsoft/kubedns/pkg/index"
 	"github.com/mandelsoft/kubedns/pkg/owner"
@@ -77,16 +79,24 @@ type HostedZoneReconciler struct {
 func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := Log.WithName(req.NamespacedName.String()).WithValues("name", req.NamespacedName)
 
-	logger.Info("reconciling")
+	var after time.Duration
+
 	// Fetch the object
 	obj := &corednsv1alpha1.HostedZone{}
 	if err := r.DataPlane.Get(ctx, req.NamespacedName, obj); err != nil {
 		if !errors.IsNotFound(err) {
+			logger.Info("error getting object to reconcile", "error", err)
 			return ctrl.Result{}, err
 		}
-		logger.Info("hosted zone object deleted")
+		logger.Info("Deleted hostedzone")
+		obj = nil
 	} else {
-		logger.Info("hosted zone object found")
+		if obj.DeletionTimestamp.IsZero() {
+			logger.Info("Reconcile hostedzone")
+			after = 300 * time.Second
+		} else {
+			logger.Info("Delete hostedzone")
+		}
 	}
 
 	if obj != nil {
@@ -109,7 +119,16 @@ func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	action := NewRequest(ctx, logger, r, req.NamespacedName, obj)
 	err := action.Reconcile()
 	err = errors2.Join(err, action.Update())
-	return ctrl.Result{}, err
+
+	requeue := false
+	if err != nil {
+		if controllerutils.RequeueRequested(err) {
+			logger.Info("Reconcilation not yet complete -> backoff: {{error}}", "error", err)
+			// Requeue does not work reliably
+		}
+		after = 0
+	}
+	return ctrl.Result{RequeueAfter: after, Requeue: requeue}, err
 }
 
 func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger logging.Logger, obj client.ObjectKey) {

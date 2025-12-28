@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/mandelsoft/kubedns/pkg/controllerutils"
 	"github.com/mandelsoft/kubedns/pkg/objutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -50,25 +51,26 @@ func (d *dnsGardener) Modify(ctx *DNSContext, obj client.Object) error {
 	ctx.Info("adding gardener annotations for {{domain}} and class {{class}}", "domain", cnames, "class", d.class)
 	objutils.SetAnnotation(obj, "dns.gardener.cloud/dnsnames", strings.Join(cnames, ","))
 	objutils.SetAnnotation(obj, "dns.gardener.cloud/class", d.class)
+	objutils.SetAnnotation(obj, "dns.gardener.cloud/ttl", "60")
 	return nil
 }
 
-func (d *dnsGardener) GetCNames(ctx *DNSContext) ([]string, error, error) {
+func (d *dnsGardener) GetCNames(ctx *DNSContext) ([]string, error) {
 	ips, cnames := isLoadBalancerReady(ctx.Service)
 	if len(cnames) == 0 && len(ips) == 0 {
 		// service change trigger reconcilation -> no backoff
-		return nil, fmt.Errorf("load balancer not yet available"), nil
+		return nil, controllerutils.RequestRequeuef("load balancer not yet available")
 	}
 	cnames, err := d.getCNames(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	for _, n := range cnames {
 		if isResolvable(n) {
-			return cnames, nil, nil
+			return cnames, nil
 		}
 	}
-	return nil, nil, fmt.Errorf("cnames not reachable, so far")
+	return nil, controllerutils.RequestRequeue(fmt.Errorf("cnames not reachable, so far"))
 }
 
 func (d *dnsGardener) getCNames(ctx *DNSContext) ([]string, error) {

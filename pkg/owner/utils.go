@@ -30,7 +30,7 @@ func MapOwnerToLocalRequest[O client.Object](owner OwnerHandler, kind schema.Gro
 		}
 		if len(log) > 0 {
 
-			log[0].Info("trigger owner {{owner}} of modified object {{{modified}}",
+			log[0].Info("trigger owner {{owner}} of modified object {{modified}}",
 				"owner", *key,
 				"modified", client.ObjectKeyFromObject(obj))
 		}

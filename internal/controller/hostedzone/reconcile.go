@@ -11,6 +11,7 @@ import (
 	"github.com/go-test/deep"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/pkg/clusterutils"
+	"github.com/mandelsoft/kubedns/pkg/controllerutils"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/kubedns/pkg/render"
 	"github.com/mandelsoft/logging"
@@ -47,8 +48,6 @@ func NewRequest(ctx context.Context, l logging.Logger, reconciler *HostedZoneRec
 
 func (r *ReconcileRequest) Reconcile() error {
 	obj := r.instance
-	// prepare finalizer update
-	patch := client.MergeFrom(r.orig)
 
 	// check responsibility
 	ok, root, err := r.IsResponsibileFor()
@@ -59,9 +58,11 @@ func (r *ReconcileRequest) Reconcile() error {
 		return err
 	}
 	r.Info("have to handle object")
-	r.Info("found status", "status", obj.Status)
 
-	if r.ChangedResponsibility() || !obj.ObjectMeta.DeletionTimestamp.IsZero() {
+	// prepare finalizer update
+	patch := client.MergeFrom(r.orig)
+
+	if obj == nil || r.ChangedResponsibility() || !obj.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Handle Deletion
 		if obj == nil || !obj.ObjectMeta.DeletionTimestamp.IsZero() {
 			r.Info("deletion of object requested")
@@ -78,16 +79,19 @@ func (r *ReconcileRequest) Reconcile() error {
 			if err := r.DeleteExternalResources(); err != nil {
 				// If cleanup fails, we don't remove the finalizer;
 				// we requeue to try again.
+				r.Info("error deleting external resources", "error", err)
 				return err
 			}
 
 			if obj != nil {
 				// Remove finalizer and update
-				r.Info("finally removing finalizer")
 				if controllerutil.RemoveFinalizer(obj, r.reconciler.Finalizer) {
+					r.Info("finally removing finalizer")
 					if err := r.reconciler.DataPlane.Patch(r, obj, patch); err != nil {
 						return client.IgnoreNotFound(err)
 					}
+				} else {
+					r.Info("finalizer already gone")
 				}
 				return nil
 			}
@@ -96,6 +100,8 @@ func (r *ReconcileRequest) Reconcile() error {
 		// Stop reconciliation as the item is being deleted
 		return nil
 	}
+
+	r.Info("found status", "status", obj.Status)
 
 	// handle finalizer
 	if obj.Spec.ParentRef != "" {
@@ -278,7 +284,7 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 		return err
 	}
 
-	values, repeat := r.Values(r.reconciler.Mode)
+	values, repeat := r.Values(r.reconciler.Mode, false)
 
 	if repeat != nil {
 		r.Info("values not yet complete: {{reason}}", "reason", repeat.Error())
@@ -286,16 +292,17 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 	// even if access for credentials has been failed, the dataplane is applied.
 	// this may create a secret required to get the access token.
 
-	r.Info("updating dataplane")
 	dataplane, runtime, err := render.Render(r.reconciler.Manifests, values)
 	if err != nil {
-		return err
+		return fmt.Errorf("error rendering manifests: %s", err.Error())
 	}
+
+	r.Info("updating dataplane")
 
 	for _, data := range dataplane {
 		_, err := clusterutils.ClientSideApply(r.reconciler.DataPlane, r, data)
 		if err != nil {
-			return err
+			return fmt.Errorf("error deploying dataplane: %s", err.Error())
 		}
 	}
 
@@ -328,7 +335,7 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 				if checkNotModifiableError(err) {
 					r.DeleteData(octx, data)
 				}
-				return err
+				return fmt.Errorf("error deploying runtime: %s", err.Error())
 			}
 			gvk := o.GetObjectKind().GroupVersionKind()
 			if gvk.Kind == "Deployment" && gvk.Group == "apps" {
@@ -398,11 +405,9 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 			sum = errors2.Join(sum, err)
 		}
 
+		var cnames []string
 		if dnsctx.Service != nil {
-			cnames, err, repeat := r.reconciler.Options.DNSHandler.GetCNames(&dnsctx)
-			if repeat != nil && err == nil {
-				err = repeat
-			}
+			cnames, err = r.reconciler.Options.DNSHandler.GetCNames(&dnsctx)
 			sum = errors2.Join(sum, repeat)
 			r.Info("cnames state", "service", svcName, "cnames", cnames, "error", err)
 			reason := corednsv1alpha1.ReasonNameserverPending
@@ -433,8 +438,8 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 				Message: "no Service for DNS server found",
 				Status:  metav1.ConditionFalse,
 			})
-			sum = errors2.Join(sum, err)
 		}
+		sum = errors2.Join(sum, err)
 
 		// calculate status summary.
 		r.summary()
@@ -452,7 +457,7 @@ func (r *ReconcileRequest) Delete(cluster clusterutils.Cluster, manifest []byte)
 	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	_, _, err := dec.Decode(manifest, nil, &obj)
 	if err != nil {
-		return err
+		return fmt.Errorf("error decosing manifest: %s", err.Error())
 	}
 
 	current := unstructured.Unstructured{}
@@ -465,20 +470,21 @@ func (r *ReconcileRequest) Delete(cluster clusterutils.Cluster, manifest []byte)
 
 	if err != nil {
 		if errors.IsNotFound(err) {
+			r.Info("object {{kind}} {{key}} already gone", "kind", obj.GroupVersionKind().GroupKind(), "key", key, "target", cluster.GetName())
 			return nil
 		}
-		return err
+		return fmt.Errorf("error getting object %s from %s: %s", key, cluster.GetName(), err.Error())
 	}
 	if !current.GetDeletionTimestamp().IsZero() {
-		return fmt.Errorf("resource %q is still being deleted", key)
+		return controllerutils.RequestRequeuef("resource %q is still being deleted", key)
 	}
-	r.Info("deleting object", "name", key.Name, "namespace", key.Namespace, "target", cluster.GetName(), "groupkind", obj.GroupVersionKind())
+	r.Info("deleting object {{kind}} {{key}}", "kind", obj.GroupVersionKind().GroupKind(), "key", key, "target", cluster.GetName())
 	err = cluster.GetClient().Delete(r, &obj)
 	return err
 }
 
 func (r *ReconcileRequest) TriggerChildren() {
-	r.reconciler.TriggerChildren(r, r.Logger, client.ObjectKeyFromObject(r.instance))
+	r.reconciler.TriggerChildren(r, r.Logger, r.ObjectKey)
 }
 
 func (r *ReconcileRequest) SetStatusCondition(condition metav1.Condition) bool {
@@ -545,21 +551,29 @@ func isDeploymentReady(deploy *appsv1.Deployment) (bool, error) {
 		if cond.Type == appsv1.DeploymentProgressing {
 			prog = true
 			if cond.Status == corev1.ConditionFalse {
-				err = fmt.Errorf("progressing: %s", cond.Message)
+				err = fmt.Errorf("no progress: %s", cond.Message)
+			} else {
+				if !avail {
+					err = controllerutils.RequestRequeuef("progressing: %s", cond.Message)
+				}
 			}
 		}
 		// Available = False means the minimum required pods aren't up
 		if cond.Type == appsv1.DeploymentAvailable {
 			avail = true
 			if cond.Status == corev1.ConditionFalse {
-				err = fmt.Errorf("unavailable: %s", cond.Message)
+				if err == nil {
+					err = fmt.Errorf("unavailable: %s", cond.Message)
+				}
+			} else {
+				err = nil
 			}
 		}
 	}
 
 	_ = prog
 	if !avail && err == nil {
-		err = fmt.Errorf("deployment not yet ready")
+		err = controllerutils.RequestRequeuef("deployment not yet ready")
 	}
 	if deploy.Status.ReadyReplicas > 0 {
 		return true, err
