@@ -2,7 +2,6 @@ package hostedzone
 
 import (
 	"context"
-	errors2 "errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -11,7 +10,7 @@ import (
 	"github.com/go-test/deep"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/pkg/clusterutils"
-	"github.com/mandelsoft/kubedns/pkg/controllerutils"
+	. "github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/kubedns/pkg/render"
 	"github.com/mandelsoft/logging"
@@ -46,16 +45,16 @@ func NewRequest(ctx context.Context, l logging.Logger, reconciler *HostedZoneRec
 	}
 }
 
-func (r *ReconcileRequest) Reconcile() error {
+func (r *ReconcileRequest) Reconcile() Problem {
 	obj := r.instance
 
 	// check responsibility
-	ok, root, err := r.IsResponsibile()
-	if !ok || err != nil {
+	ok, root, prob := r.IsResponsibile()
+	if !ok || prob != nil {
 		if !ok {
 			r.Info("not responsible for this zone")
 		}
-		return err
+		return prob
 	}
 	r.Info("have to handle object")
 
@@ -76,11 +75,11 @@ func (r *ReconcileRequest) Reconcile() error {
 				r.Info("already active -> delete dependent resources")
 			}
 			// Run your external cleanup logic here
-			if err := r.DeleteExternalResources(); err != nil {
+			if prob := r.DeleteExternalResources(); prob != nil {
 				// If cleanup fails, we don't remove the finalizer;
 				// we requeue to try again.
-				r.Info("error deleting external resources", "error", err)
-				return err
+				r.Info("error deleting external resources", "error", prob.String())
+				return prob
 			}
 
 			if obj != nil {
@@ -88,7 +87,7 @@ func (r *ReconcileRequest) Reconcile() error {
 				if controllerutil.RemoveFinalizer(obj, r.reconciler.Finalizer) {
 					r.Info("finally removing finalizer")
 					if err := r.reconciler.DataPlane.Patch(r, obj, patch); err != nil {
-						return client.IgnoreNotFound(err)
+						return TemporaryProblem(client.IgnoreNotFound(err))
 					}
 				} else {
 					r.Info("finalizer already gone")
@@ -109,13 +108,13 @@ func (r *ReconcileRequest) Reconcile() error {
 		if controllerutil.RemoveFinalizer(obj, r.reconciler.Finalizer) {
 			r.Info("removing finalizer for slave zone")
 			if err := r.reconciler.DataPlane.Patch(r, obj, patch); err != nil {
-				return client.IgnoreNotFound(err)
+				return TemporaryProblem(client.IgnoreNotFound(err))
 			}
 		}
 	} else {
 		if controllerutil.AddFinalizer(obj, r.reconciler.Finalizer) {
 			if err := r.reconciler.DataPlane.Patch(r, obj, patch); err != nil {
-				return client.IgnoreNotFound(err)
+				return TemporaryProblem(client.IgnoreNotFound(err))
 			}
 			r.Info("taking responsibilty")
 		}
@@ -158,7 +157,7 @@ func (r *ReconcileRequest) ChangedResponsibility() bool {
 	return false
 }
 
-func (r *ReconcileRequest) IsResponsibile() (bool, *Responsibility, error) {
+func (r *ReconcileRequest) IsResponsibile() (bool, *Responsibility, Problem) {
 	obj := r.instance
 	if obj == nil {
 		return true, nil, nil
@@ -168,20 +167,23 @@ func (r *ReconcileRequest) IsResponsibile() (bool, *Responsibility, error) {
 		force = true
 	}
 	r.Info("lookup root")
-	info, ok, err := r.reconciler.GetRootInfo(r, r, obj)
-	if err != nil {
+	info, ok, prob := r.reconciler.GetRootInfo(r, r, obj)
+	if prob != nil && prob.Error() != nil { // no incomplete state
+		if prob.Requeue() {
+			return false, nil, prob
+		}
 		if ok {
 			// dangling object, always report problem
-			r.Info("report dangling zone", "error", err.Error())
+			r.Info("report zone problem", "error", prob.Error())
 			r.SetStatusCondition(metav1.Condition{
 				Type:    corednsv1alpha1.ValidationConditionType,
 				Status:  metav1.ConditionFalse, // Use metav1 constant
 				Reason:  corednsv1alpha1.ReasonInvalidParent,
-				Message: err.Error(),
+				Message: prob.Error().Error(),
 			})
-			err = nil
+			prob = nil
 		}
-		return false, nil, err
+		return false, nil, prob
 	}
 	if force {
 		return true, info, nil
@@ -198,7 +200,7 @@ func (r *ReconcileRequest) IsResponsibile() (bool, *Responsibility, error) {
 
 }
 
-func (r *ReconcileRequest) handleObject(root *Responsibility) error {
+func (r *ReconcileRequest) handleObject(root *Responsibility) Problem {
 	reason, err := r.Validate(root)
 	if err != nil {
 		if reason != "" {
@@ -209,7 +211,7 @@ func (r *ReconcileRequest) handleObject(root *Responsibility) error {
 				Message: err.Error(),
 			})
 		}
-		return err
+		return Failed(err)
 	}
 
 	var observed *corednsv1alpha1.Observed
@@ -251,9 +253,11 @@ func (r *ReconcileRequest) Update() error {
 			return fmt.Errorf("failed to update changed status: %w", err)
 		}
 		r.TriggerChildren()
+		r.TriggerEntries()
 	} else {
 		if r.orig == nil || !r.orig.GetDeletionTimestamp().IsZero() {
 			r.TriggerChildren()
+			r.TriggerEntries()
 		}
 	}
 	return nil
@@ -273,15 +277,15 @@ func (r *ReconcileRequest) ApplyData(octx clusterutils.OperationContext, data []
 	return o, err
 }
 
-func (r *ReconcileRequest) DeleteData(octx clusterutils.OperationContext, data []byte) error {
+func (r *ReconcileRequest) DeleteData(octx clusterutils.OperationContext, data []byte) Problem {
 	return r.Delete(r.reconciler.Runtime, data)
 }
 
-func (r *ReconcileRequest) HandleExternalResources() error {
+func (r *ReconcileRequest) HandleExternalResources() Problem {
 
-	err := r.reconciler.Mode.Prepare(r.ReconcileContext)
-	if err != nil {
-		return err
+	prob := r.reconciler.Mode.Prepare(r.ReconcileContext)
+	if prob != nil {
+		return prob
 	}
 
 	values, repeat := r.Values(r.reconciler.Mode, false)
@@ -294,7 +298,7 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 
 	dataplane, runtime, err := render.Render(r.reconciler.Manifests, values)
 	if err != nil {
-		return fmt.Errorf("error rendering manifests: %s", err.Error())
+		return Failedf("error rendering manifests: %s", err.Error())
 	}
 
 	r.Info("updating dataplane")
@@ -302,7 +306,7 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 	for _, data := range dataplane {
 		_, err := clusterutils.ClientSideApply(r.reconciler.DataPlane, r, data)
 		if err != nil {
-			return fmt.Errorf("error deploying dataplane: %s", err.Error())
+			return TemporaryProblemf("error deploying dataplane: %s", err.Error())
 		}
 	}
 
@@ -335,7 +339,7 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 				if checkNotModifiableError(err) {
 					r.DeleteData(octx, data)
 				}
-				return fmt.Errorf("error deploying runtime: %s", err.Error())
+				return TemporaryProblemf("error deploying runtime: %s", err.Error())
 			}
 			gvk := o.GetObjectKind().GroupVersionKind()
 			if gvk.Kind == "Deployment" && gvk.Group == "apps" {
@@ -350,15 +354,7 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 					dnsctx.Service = &tmp
 				} else {
 					if !errors.IsNotFound(err) {
-						err = fmt.Errorf("failing to read service %q; %w", client.ObjectKeyFromObject(o), err)
-						meta.SetStatusCondition(&r.instance.Status.Conditions, metav1.Condition{
-							Type:               corednsv1alpha1.RuntimeConditionType,
-							Reason:             corednsv1alpha1.ReasonUpdateFailed,
-							Status:             metav1.ConditionFalse,
-							Message:            err.Error(),
-							ObservedGeneration: r.instance.Generation,
-						})
-						return err
+						return TemporaryProblem(err)
 					}
 				}
 			}
@@ -368,23 +364,23 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 		for _, data := range r.reconciler.Options.DNSHandler.Manifests(&dnsctx, values) {
 			_, err := r.ApplyData(octx, data)
 			if err != nil {
-				return err
+				return TemporaryProblem(err)
 			}
 		}
 
-		var sum error
+		var sum Problem
 		var deployment appsv1.Deployment
 
 		if err := r.reconciler.Runtime.Get(r, deplName, &deployment); err == nil {
-			ok, err := isDeploymentReady(&deployment)
+			ok, prob := isDeploymentReady(&deployment)
 			r.Info("deployment state", "deployment", deplName, "ready", ok, "error", err)
 			msg := "Deployment serving requests"
 			reason := corednsv1alpha1.ReasonRuntimeAvailable
 			if !ok {
 				reason = corednsv1alpha1.ReasonRuntimeUnavailable
 			}
-			if err != nil {
-				msg = err.Error()
+			if prob != nil {
+				msg = prob.Message()
 				if ok {
 					reason = corednsv1alpha1.ReasonRuntimeDeploying
 				}
@@ -396,25 +392,28 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 				Status:  ConditionStatus(ok),
 			})
 		} else {
-			r.SetStatusCondition(metav1.Condition{
-				Type:    corednsv1alpha1.RuntimeConditionType,
-				Reason:  corednsv1alpha1.ReasonRuntimeUnavailable,
-				Message: err.Error(),
-				Status:  metav1.ConditionFalse,
-			})
-			sum = errors2.Join(sum, err)
+			if errors.IsNotFound(err) {
+				r.SetStatusCondition(metav1.Condition{
+					Type:    corednsv1alpha1.RuntimeConditionType,
+					Reason:  corednsv1alpha1.ReasonRuntimeUnavailable,
+					Message: err.Error(),
+					Status:  metav1.ConditionFalse,
+				})
+			}
+			sum = AggregateProblem(sum, TemporaryProblem(err))
 		}
 
 		var cnames []string
+		var prob Problem
 		if dnsctx.Service != nil {
-			cnames, err = r.reconciler.Options.DNSHandler.GetCNames(&dnsctx)
-			sum = errors2.Join(sum, repeat)
+			cnames, prob = r.reconciler.Options.DNSHandler.GetCNames(&dnsctx)
+			sum = AggregateProblem(sum, prob)
 			r.Info("cnames state", "service", svcName, "cnames", cnames, "error", err)
 			reason := corednsv1alpha1.ReasonNameserverPending
 			msg := "waiting for external access to be provisioned"
 			ok := false
-			if err != nil {
-				msg = err.Error()
+			if prob != nil {
+				msg = prob.Message()
 			} else {
 				if len(cnames) > 0 {
 					r.instance.Status.NameServers = cnames
@@ -438,8 +437,8 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 				Message: "no Service for DNS server found",
 				Status:  metav1.ConditionFalse,
 			})
+			sum = AggregateProblem(sum, Requeuef("service not found"))
 		}
-		sum = errors2.Join(sum, err)
 
 		// calculate status summary.
 		r.summary()
@@ -452,12 +451,12 @@ func (r *ReconcileRequest) HandleExternalResources() error {
 	return nil
 }
 
-func (r *ReconcileRequest) Delete(cluster clusterutils.Cluster, manifest []byte) error {
+func (r *ReconcileRequest) Delete(cluster clusterutils.Cluster, manifest []byte) Problem {
 	obj := unstructured.Unstructured{}
 	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	_, _, err := dec.Decode(manifest, nil, &obj)
 	if err != nil {
-		return fmt.Errorf("error decosing manifest: %s", err.Error())
+		return Failedf("error decoding manifest: %s", err.Error())
 	}
 
 	current := unstructured.Unstructured{}
@@ -473,18 +472,25 @@ func (r *ReconcileRequest) Delete(cluster clusterutils.Cluster, manifest []byte)
 			r.Info("object {{kind}} {{key}} already gone", "kind", obj.GroupVersionKind().GroupKind(), "key", key, "target", cluster.GetName())
 			return nil
 		}
-		return fmt.Errorf("error getting object %s from %s: %s", key, cluster.GetName(), err.Error())
+		return TemporaryProblemf("error getting object %s from %s: %s", key, cluster.GetName(), err.Error())
 	}
 	if !current.GetDeletionTimestamp().IsZero() {
-		return controllerutils.RequestRequeuef("resource %q is still being deleted", key)
+		return Requeuef("resource %q is still being deleted", key)
 	}
 	r.Info("deleting object {{kind}} {{key}}", "kind", obj.GroupVersionKind().GroupKind(), "key", key, "target", cluster.GetName())
 	err = cluster.GetClient().Delete(r, &obj)
-	return err
+	if errors.IsNotFound(err) {
+		return nil
+	}
+	return TemporaryProblem(err)
 }
 
 func (r *ReconcileRequest) TriggerChildren() {
 	r.reconciler.TriggerChildren(r, r.Logger, r.ObjectKey)
+}
+
+func (r *ReconcileRequest) TriggerEntries() {
+	r.reconciler.TriggerEntries(r, r.Logger, r.ObjectKey)
 }
 
 func (r *ReconcileRequest) SetStatusCondition(condition metav1.Condition) bool {
@@ -540,8 +546,8 @@ func isLoadBalancerReady(svc *corev1.Service) ([]net.IP, []string) {
 	return ips, cnames
 }
 
-func isDeploymentReady(deploy *appsv1.Deployment) (bool, error) {
-	var err error
+func isDeploymentReady(deploy *appsv1.Deployment) (bool, Problem) {
+	var prob Problem
 
 	prog := false
 	avail := false
@@ -551,10 +557,10 @@ func isDeploymentReady(deploy *appsv1.Deployment) (bool, error) {
 		if cond.Type == appsv1.DeploymentProgressing {
 			prog = true
 			if cond.Status == corev1.ConditionFalse {
-				err = fmt.Errorf("no progress: %s", cond.Message)
+				prob = WatchBackedProblemf("no progress: %s", cond.Message)
 			} else {
 				if !avail {
-					err = controllerutils.RequestRequeuef("progressing: %s", cond.Message)
+					prob = WatchBackedProblemf("progressing: %s", cond.Message)
 				}
 			}
 		}
@@ -562,23 +568,23 @@ func isDeploymentReady(deploy *appsv1.Deployment) (bool, error) {
 		if cond.Type == appsv1.DeploymentAvailable {
 			avail = true
 			if cond.Status == corev1.ConditionFalse {
-				if err == nil {
-					err = fmt.Errorf("unavailable: %s", cond.Message)
+				if prob == nil {
+					prob = WatchBackedProblemf("unavailable: %s", cond.Message)
 				}
 			} else {
-				err = nil
+				prob = nil
 			}
 		}
 	}
 
 	_ = prog
-	if !avail && err == nil {
-		err = controllerutils.RequestRequeuef("deployment not yet ready")
+	if !avail && prob == nil {
+		prob = WatchBackedProblemf("deployment not yet ready")
 	}
 	if deploy.Status.ReadyReplicas > 0 {
-		return true, err
+		return true, prob
 	}
-	return false, err
+	return false, prob
 }
 
 func checkNotModifiableError(err error) bool {

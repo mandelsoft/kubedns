@@ -21,6 +21,7 @@ const RuntimeConditionType = "Runtime"
 
 const ReasonUpdateFailed = "UpdateFailed"
 const ReasonRuntimeUnavailable = "RuntimeUnavailable"
+const ReasonRuntimeInternalError = "InternalProblem"
 const ReasonRuntimeDeploying = "RuntimeDeploying"
 const ReasonRuntimeAvailable = "RuntimeAvailable"
 

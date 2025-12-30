@@ -6,7 +6,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/mandelsoft/kubedns/pkg/controllerutils"
+	"github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
 	"github.com/mandelsoft/kubedns/pkg/objutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -55,22 +55,22 @@ func (d *dnsGardener) Modify(ctx *DNSContext, obj client.Object) error {
 	return nil
 }
 
-func (d *dnsGardener) GetCNames(ctx *DNSContext) ([]string, error) {
+func (d *dnsGardener) GetCNames(ctx *DNSContext) ([]string, reconcile.Problem) {
 	ips, cnames := isLoadBalancerReady(ctx.Service)
 	if len(cnames) == 0 && len(ips) == 0 {
 		// service change trigger reconcilation -> no backoff
-		return nil, controllerutils.RequestRequeuef("load balancer not yet available")
+		return nil, reconcile.WatchBackedProblemf("load balancer not yet available")
 	}
 	cnames, err := d.getCNames(ctx)
 	if err != nil {
-		return nil, err
+		return nil, reconcile.WatchBackedProblem(err)
 	}
 	for _, n := range cnames {
 		if isResolvable(n) {
 			return cnames, nil
 		}
 	}
-	return nil, controllerutils.RequestRequeue(fmt.Errorf("cnames not reachable, so far"))
+	return nil, reconcile.Requeuef("cnames not reachable, so far")
 }
 
 func (d *dnsGardener) getCNames(ctx *DNSContext) ([]string, error) {

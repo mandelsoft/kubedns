@@ -1,6 +1,7 @@
 package hostedzone
 
 import (
+	"github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -11,8 +12,8 @@ type Mode interface {
 
 	AccessValues(ctx ReconcileContext, name string, deleting bool) (map[string]interface{}, error)
 
-	Prepare(ctx ReconcileContext) error
-	Cleanup(ctx ReconcileContext, name string) error
+	Prepare(ctx ReconcileContext) reconcile.Problem
+	Cleanup(ctx ReconcileContext, name string) reconcile.Problem
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -21,7 +22,7 @@ type ModeImpl struct {
 	*HostedZoneReconciler
 }
 
-func (m *ModeImpl) Cleanup(ctx ReconcileContext, name string) error {
+func (m *ModeImpl) Cleanup(ctx ReconcileContext, name string) reconcile.Problem {
 	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
 	if !ctx.Simulate {
 		m.index.Remove(INDEX_SASECFRET, ctx.ObjectKey, key)

@@ -18,14 +18,13 @@ package hostedzone
 
 import (
 	"context"
-	errors2 "errors"
 	"fmt"
 	"slices"
 	"time"
 
 	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/kubedns/pkg/clusterutils"
-	"github.com/mandelsoft/kubedns/pkg/controllerutils"
+	. "github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
 	"github.com/mandelsoft/kubedns/pkg/index"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/logging"
@@ -87,6 +86,7 @@ func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, err
 		}
 		logger.Info("Deleted hostedzone")
+		r.TriggerEntries(ctx, logger, req.NamespacedName)
 		obj = nil
 	} else {
 		if obj.DeletionTimestamp.IsZero() {
@@ -109,24 +109,17 @@ func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			})
 			if mod && err == nil {
 				r.TriggerChildren(ctx, logger, req.NamespacedName)
+				r.TriggerEntries(ctx, logger, req.NamespacedName)
 			}
 			return reconcile.Result{}, err
 		}
 	}
 
 	action := NewRequest(ctx, logger, r, req.NamespacedName, obj)
-	err := action.Reconcile()
-	err = errors2.Join(err, action.Update())
+	prob := action.Reconcile()
+	prob = AggregateProblem(prob, TemporaryProblem(action.Update()))
 
-	requeue := false
-	if err != nil {
-		if controllerutils.RequeueRequested(err) {
-			logger.Info("Reconcilation not yet complete -> backoff: {{error}}", "error", err)
-			// Requeue does not work reliably
-		}
-		after = 0
-	}
-	return ctrl.Result{RequeueAfter: after, Requeue: requeue}, err
+	return Result(logger, prob, after)
 }
 
 func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger logging.Logger, obj client.ObjectKey) {
@@ -138,7 +131,15 @@ func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger loggi
 	}
 }
 
-func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.Logger, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, error) {
+func (r *HostedZoneReconciler) TriggerEntries(ctx context.Context, logger logging.Logger, obj client.ObjectKey) {
+	entries := r.GetEntriesForZone(ctx, obj.Namespace, obj.Name)
+	logger.Info("notify {{amount}} children about changes", "amount", len(entries))
+	for _, c := range entries {
+		r.DataPlane.EnqueueByObject(&c)
+	}
+}
+
+func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.Logger, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, Problem) {
 	var path string
 	var directParent *corednsv1alpha1.HostedZone
 
@@ -148,17 +149,17 @@ func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.L
 		path = path + "/" + obj.Spec.ParentRef
 		logger.Info("handle parent", "parent", path)
 		if slices.Contains(hist, obj.Spec.ParentRef) {
-			return nil, true, fmt.Errorf("reference cyle %s", path)
+			return nil, true, Failedf("reference cyle %s", path)
 		}
 		err := r.DataPlane.Get(ctx, client.ObjectKey{obj.GetNamespace(), obj.Spec.ParentRef}, &parent)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				return nil, true, fmt.Errorf("parent %s not found", obj.Spec.ParentRef)
+				return nil, true, Failedf("parent %s not found", obj.Spec.ParentRef)
 			}
-			return nil, false, err
+			return nil, false, TemporaryProblem(err)
 		}
 		if !parent.GetDeletionTimestamp().IsZero() {
-			return nil, true, fmt.Errorf("parent %s deleted", obj.Spec.ParentRef)
+			return nil, true, Failedf("parent %s deleted", obj.Spec.ParentRef)
 		}
 		if directParent == nil {
 			directParent = &parent

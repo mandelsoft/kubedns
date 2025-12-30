@@ -91,7 +91,7 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 	}
 
 	cfg := ctrl.Options{
-		Logger:                  logging.DefaultContext().Logger(logging.NewRealm("conntroller-manager")).V(4),
+		Logger:                  logging.DefaultContext().Logger(logging.NewRealm("controller-manager")).V(4),
 		Scheme:                  main.GetScheme(),
 		Metrics:                 metrics.GetMetricsServerOpts(),
 		WebhookServer:           web.GetServer(),

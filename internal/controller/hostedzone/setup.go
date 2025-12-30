@@ -38,7 +38,6 @@ func Create(opts flagutils.OptionSetProvider) error {
 	if err != nil {
 		return err
 	}
-	_ = trigger
 
 	if r.Options.Class != "" {
 		r.FieldManager += "-" + r.Options.Class

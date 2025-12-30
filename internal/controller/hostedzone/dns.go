@@ -2,6 +2,7 @@ package hostedzone
 
 import (
 	"github.com/mandelsoft/kubedns/pkg/controllerutils"
+	"github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -18,5 +19,5 @@ type DNSContext struct {
 type DNSHandler interface {
 	Manifests(ctx *DNSContext, values map[string]interface{}) [][]byte
 	Modify(ctx *DNSContext, obj client.Object) error
-	GetCNames(ctx *DNSContext) (cnames []string, err error)
+	GetCNames(ctx *DNSContext) (cnames []string, prob reconcile.Problem)
 }

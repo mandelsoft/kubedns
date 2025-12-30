@@ -3,7 +3,7 @@ package hostedzone
 import (
 	"context"
 
-	"github.com/mandelsoft/kubedns/pkg/controllerutils"
+	"github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -26,13 +26,13 @@ func (l *dnsLoadbalancer) Modify(ctx *DNSContext, obj client.Object) error {
 	return nil
 }
 
-func (l *dnsLoadbalancer) GetCNames(ctx *DNSContext) ([]string, error) {
+func (l *dnsLoadbalancer) GetCNames(ctx *DNSContext) ([]string, reconcile.Problem) {
 	ips, cnames := isLoadBalancerReady(ctx.Service)
 	if len(cnames) > 0 {
 		return cnames, nil
 	}
 	if len(ips) > 0 {
-		return nil, controllerutils.RequestRequeuef("no cnames available for load balancer")
+		return nil, reconcile.WatchBackedProblemf("no cnames available for load balancer")
 	}
-	return nil, nil
+	return nil, reconcile.WatchBackedProblemf("load balancer not yet available")
 }

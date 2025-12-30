@@ -3,6 +3,7 @@ package hostedzone
 import (
 	"fmt"
 
+	"github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -36,6 +37,6 @@ func (m *LocalMode) AccessValues(ctx ReconcileContext, name string, deleting boo
 	return nil, nil
 }
 
-func (m *LocalMode) Prepare(ctx ReconcileContext) error {
+func (m *LocalMode) Prepare(ctx ReconcileContext) reconcile.Problem {
 	return nil
 }

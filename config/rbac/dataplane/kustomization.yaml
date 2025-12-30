@@ -21,7 +21,7 @@ resources:
 - coredns_hostedzone_admin_role.yaml
 - coredns_hostedzone_editor_role.yaml
 - coredns_hostedzone_viewer_role.yaml
--
+
 - coredns_corednsentry_admin_role.yaml
 - coredns_corednsentry_editor_role.yaml
 - coredns_corednsentry_viewer_role.yaml

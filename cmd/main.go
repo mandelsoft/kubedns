@@ -70,6 +70,7 @@ func main() {
 		hostedzone.NewOptions(),
 	)
 
+	setup.Log.Info("condiguring options...")
 	setup.Setup(options, os.Args[1:]...)
 
 	setup.ExitIfErr(hostedzone.TestRenderManifests(), "problems with included mainfests")

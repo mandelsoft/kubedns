@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	. "github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -98,7 +99,7 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting b
 	return access, nil
 }
 
-func (m *RuntimeMode) Prepare(ctx ReconcileContext) error {
+func (m *RuntimeMode) Prepare(ctx ReconcileContext) Problem {
 	// assure target namespace
 	var ns v1.Namespace
 	namespace := m.RuntimeNamespace(ctx.ObjectKey)
@@ -110,12 +111,12 @@ func (m *RuntimeMode) Prepare(ctx ReconcileContext) error {
 			err = m.Runtime.Create(ctx, &ns)
 		}
 	}
-	return err
+	return TemporaryProblem(err)
 }
 
-func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) error {
-	if err := m.ModeImpl.Cleanup(ctx, name); err != nil {
-		return err
+func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) Problem {
+	if prob := m.ModeImpl.Cleanup(ctx, name); prob != nil {
+		return prob
 	}
 
 	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
@@ -124,25 +125,24 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) error {
 	}
 
 	var secret v1.Secret
-	err := m.DataPlane.Get(ctx, key, &secret)
-	if err != nil {
+	if err := m.DataPlane.Get(ctx, key, &secret); err != nil {
 		if !errors.IsNotFound(err) {
-			return err
+			return TemporaryProblem(err)
 		}
 		ctx.Info("serviceaccount secret {{secret}} already gone", "secret", key)
-		err = nil
 	} else {
 		if secret.GetDeletionTimestamp().IsZero() {
 			ctx.Info("request deletion of serviceaccount secret {{secret}}", "secret", key)
 			err = m.DataPlane.Delete(ctx, &secret)
 			if err != nil {
-				if errors.IsNotFound(err) {
-					ctx.Info(" serviceaccount secret {{secret}} already gone", "secret", key)
-					err = nil
+				if !errors.IsNotFound(err) {
+					return TemporaryProblem(err)
 				}
+				ctx.Info(" serviceaccount secret {{secret}} already gone", "secret", key)
 			}
 		} else {
 			ctx.Info(" serviceaccount secret {{secret}} is waiting for finalizers {{finalizers}}", "secret", key, "finalizers", secret.Finalizers)
+			return Requeuef("waiting for secret finalizers to be removed")
 		}
 	}
 
@@ -154,17 +154,13 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) error {
 			if errors.IsNotFound(err) {
 				return nil
 			}
-			return err
+			return TemporaryProblem(err)
 		}
 		if len(ns.Finalizers) > 0 {
-			return nil
+			return Requeuef("waiting for namespace finalizers to be removed")
 		}
 
 	}
-	if err == nil {
-		ctx.Info("cleanup successful")
-	} else {
-		ctx.Info("cleanup with error", "error", err)
-	}
-	return err
+	ctx.Info("cleanup successful")
+	return nil
 }
