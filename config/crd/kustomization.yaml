@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/coredns.mandelsoft.org_hostedzones.yaml
+- bases/coredns.mandelsoft.org_corednsentries.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

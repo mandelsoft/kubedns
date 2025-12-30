@@ -6,11 +6,9 @@ import (
 	"strings"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/goutils/general"
-	"github.com/mandelsoft/kubedns/pkg/options/kubeconfigopts"
+	"github.com/mandelsoft/kubedns/pkg/clusterutils"
 	"github.com/mandelsoft/kubedns/pkg/options/manageropts"
 	"github.com/spf13/pflag"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -23,8 +21,6 @@ type Options struct {
 	DNSMode          string
 	RuntimeNamespace string
 	Platform         string
-
-	RuntimeConfig *kubeconfigopts.Options
 
 	DNSHandler DNSHandler
 }
@@ -39,25 +35,30 @@ var (
 	_ manageropts.ConfigurationProvider = (*Options)(nil)
 )
 
-func NewOptions(def ...*kubeconfigopts.Options) *Options {
-	return &Options{
-		RuntimeConfig: kubeconfigopts.New("use separated runtime cluster", "runtime").WithFallback(general.Optional(def...)),
-	}
+func NewOptions() *Options {
+	return &Options{}
 }
 
 func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	var err error
 
-	o.DNSHandler, err = DNSModes.Create(ctx, o.DNSMode, o)
+	clusters, err := clusterutils.ValidatedClusters(ctx, opts, v)
 	if err != nil {
 		return err
 	}
-	return o.RuntimeConfig.Validate(ctx, opts, v)
+	if clusters.Get("dataplane") == nil {
+		return fmt.Errorf("dataplane cluster is required")
+	}
+	if clusters.Get("runtime") == nil {
+		return fmt.Errorf("dataplane cluster is required")
+	}
+
+	o.DNSHandler, err = DNSModes.Create(ctx, o.DNSMode, o)
+	return err
 }
 
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	modes := DNSModes.Names()
-	o.RuntimeConfig.AddFlags(fs)
 	fs.StringVarP(&o.RuntimeNamespace, "runtime-namespace", "", "", "use single runtime namespace for deployments")
 	fs.StringVarP(&o.Runtime, "runtime", "", "", "name of the runtime class to handle")
 	fs.StringVarP(&o.Class, "class", "", "", "name of the controller class to handle")
@@ -77,8 +78,4 @@ func (o *Options) Configure(ctx context.Context, cfg *ctrl.Options, opts flaguti
 		cfg.LeaderElectionID = o.Class + "-" + cfg.LeaderElectionID
 	}
 	return nil
-}
-
-func (o *Options) GetRestConfig() *rest.Config {
-	return o.RuntimeConfig.GetRestConfig()
 }

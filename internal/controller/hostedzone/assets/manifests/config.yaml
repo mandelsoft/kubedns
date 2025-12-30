@@ -19,6 +19,7 @@ data:
         zoneobject (( values.dataplane.zone ))
         namespaces (( values.dataplane.namespace ))
         transitive
+        slave
         (( (values.runtime.secret != "" ) ? "endpoint " values.dataplane.server  :"" ))
         (( (values.runtime.secret != "" ) ? "token /etc/coredns/access/token /etc/coredns/access/ca.crt" :"" ))
         ttl 30

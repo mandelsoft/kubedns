@@ -20,11 +20,12 @@ import (
 	"context"
 	errors2 "errors"
 	"fmt"
+	"slices"
 	"time"
 
+	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/kubedns/pkg/clusterutils"
 	"github.com/mandelsoft/kubedns/pkg/controllerutils"
-	"github.com/mandelsoft/kubedns/pkg/enqueue"
 	"github.com/mandelsoft/kubedns/pkg/index"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/logging"
@@ -49,17 +50,14 @@ type Responsibility struct {
 
 // HostedZoneReconciler reconciles a HostedZone object
 type HostedZoneReconciler struct {
-	logging.Logger
+	*common.Reconciler
 	Mode         Mode
 	Finalizer    string
-	FieldManager string
 	DataPlaneURL string
 
 	Manifests map[string][]byte
 
 	Options      *Options
-	Mux          enqueue.Mux
-	DataPlane    clusterutils.Cluster
 	Runtime      clusterutils.Cluster
 	runtimeOwner owner.OwnerHandler
 	dns          DNSHandler
@@ -77,7 +75,7 @@ type HostedZoneReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.4/pkg/reconcile
 func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := Log.WithName(req.NamespacedName.String()).WithValues("name", req.NamespacedName)
+	logger := Log.WithName(req.String()).WithValues("object", req.NamespacedName)
 
 	var after time.Duration
 
@@ -133,10 +131,10 @@ func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger logging.Logger, obj client.ObjectKey) {
 	logger.Info("notify children about changes")
-	children := r.GetChildren(ctx, obj.Namespace, obj.Name)
+	children := r.GetNestedZones(ctx, obj.Namespace, obj.Name)
 	for _, c := range children {
 		logger.Info("triggering child", "name", c.Name, "namespace", c.Namespace)
-		r.Mux.EnqueueByObject(&c)
+		r.DataPlane.EnqueueByObject(&c)
 	}
 }
 
@@ -144,10 +142,14 @@ func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.L
 	var path string
 	var directParent *corednsv1alpha1.HostedZone
 
+	hist := []string{obj.GetName()}
 	for obj.Spec.ParentRef != "" {
 		var parent corednsv1alpha1.HostedZone
 		path = path + "/" + obj.Spec.ParentRef
 		logger.Info("handle parent", "parent", path)
+		if slices.Contains(hist, obj.Spec.ParentRef) {
+			return nil, true, fmt.Errorf("reference cyle %s", path)
+		}
 		err := r.DataPlane.Get(ctx, client.ObjectKey{obj.GetNamespace(), obj.Spec.ParentRef}, &parent)
 		if err != nil {
 			if errors.IsNotFound(err) {

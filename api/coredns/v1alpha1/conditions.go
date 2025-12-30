@@ -4,6 +4,8 @@ const ValidationConditionType = "Validation"
 const ReasonConfigurarationWarning = "ConfigurarationWarning"
 const ReasonConfigurarationValid = "ConfigurationValid"
 
+const ReasonConfigurarationInvalid = "ConfigurationInvalid"
+
 const ReasonDomainNameMissing = "DomainNameMissing"
 const ReasonEMailMissing = "EMailMissing"
 const ReasonExpireMissing = "ExpireMissing"

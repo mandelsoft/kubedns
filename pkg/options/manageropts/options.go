@@ -2,18 +2,25 @@ package manageropts
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/kubedns/pkg/options/kubeconfigopts"
+	"github.com/mandelsoft/kubedns/pkg/clusterutils"
 	"github.com/mandelsoft/kubedns/pkg/options/metricsopts"
 	"github.com/mandelsoft/kubedns/pkg/options/tlsopts"
 	"github.com/mandelsoft/kubedns/pkg/options/webhookopts"
+	"github.com/mandelsoft/logging"
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Options struct {
+	// main is the cluster used as main cluster for the manager
+	main                    string
 	Nested                  flagutils.OptionSet
 	EnableLeaderElection    bool
 	LeaderElectionNamespace string
@@ -26,8 +33,7 @@ type Options struct {
 	// They are used to finalize the manager options before
 	// the manager is created.
 	Configurations []ConfigurationProvider
-	Scheme         *runtime.Scheme
-	mgr            ctrl.Manager
+	mgmt           ControllerManagerContext
 }
 
 func From(opts flagutils.OptionSetProvider) *Options {
@@ -40,21 +46,35 @@ var (
 	_ flagutils.OptionSet   = (*Options)(nil) // forward kubeconfig options as nested set
 )
 
-func New(kube *kubeconfigopts.Options, scheme *runtime.Scheme, electionId string, configs ...ConfigurationProvider) *Options {
-	nested := flagutils.DefaultOptionSet{}
-	if kube == nil {
-		kube = kubeconfigopts.New("standard kubeconfig")
+func New(main string, electionId string, configs ...ConfigurationProvider) *Options {
+	if main == "" {
+		main = clusterutils.DEFAULT
 	}
-	nested = append(nested, kube)
+	nested := flagutils.DefaultOptionSet{}
 	nested = append(nested, tlsopts.New())
-	return &Options{Nested: nested, defaultElectionId: electionId, Scheme: scheme, Configurations: configs}
+	return &Options{Nested: nested, defaultElectionId: electionId, Configurations: configs, main: main}
 }
 
 func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
+	if o.mgmt.Manager != nil {
+		return nil
+	}
+
 	err := flagutils.Validate(ctx, o.Nested, v)
 	if err != nil {
 		return err
 	}
+
+	o.mgmt.Clusters, err = clusterutils.ValidatedClusters(ctx, opts, v)
+	if err != nil {
+		return err
+	}
+
+	main := o.mgmt.Get(o.main)
+	if main == nil {
+		return fmt.Errorf("could not find main cluster %q", o.main)
+	}
+
 	metrics, err := flagutils.ValidatedOptions[*metricsopts.Options](ctx, opts, v)
 	if err != nil {
 		return err
@@ -65,18 +85,14 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 		return err
 	}
 
-	kube, err := flagutils.ValidatedOptions[*kubeconfigopts.Options](ctx, opts, v)
-	if err != nil {
-		return err
-	}
-
 	configs, err := flagutils.ValidatedFilteredOptions[ConfigurationProvider](ctx, opts, v)
 	if err != nil {
 		return err
 	}
 
 	cfg := ctrl.Options{
-		Scheme:                  o.Scheme,
+		Logger:                  logging.DefaultContext().Logger(logging.NewRealm("conntroller-manager")).V(4),
+		Scheme:                  main.GetScheme(),
 		Metrics:                 metrics.GetMetricsServerOpts(),
 		WebhookServer:           web.GetServer(),
 		HealthProbeBindAddress:  o.ProbeAddr,
@@ -94,6 +110,15 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
+
+		// implicit cluster creation cannot be circumvented (why), so fake
+		// using shared info as far as possible.,
+		NewClient: func(config *rest.Config, options client.Options) (client.Client, error) {
+			return main.GetClient(), nil
+		},
+		NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+			return main.GetCache(), nil
+		},
 	}
 
 	for _, conf := range configs {
@@ -113,9 +138,27 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 			return err
 		}
 	}
-	o.mgr, err = ctrl.NewManager(kube.GetRestConfig(), cfg)
-	o.mgr.GetConfig()
-	return err
+	o.mgmt.Manager, err = ctrl.NewManager(main.GetConfig(), cfg)
+	if err != nil {
+		return err
+	}
+
+	found := sets.New[*rest.Config]()
+
+	for c := range o.mgmt.Clusters.Clusters {
+		rcfg := c.GetEffective().GetConfig()
+		if !found.Has(rcfg) {
+			found.Insert(rcfg)
+			cfg.Logger.Info("adding cluster {{cluster}} -> {{effective}}", "cluster", c.GetName(), "effective", c.GetEffective().GetName())
+			err = o.mgmt.Manager.Add(c.GetEffective())
+		} else {
+			cfg.Logger.Info("cluster {{cluster}} -> {{effective}} already added", "cluster", c.GetName(), "effective", c.GetEffective().GetName())
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
@@ -141,5 +184,26 @@ func (o *Options) Options(yield func(flagutils.Options) bool) {
 ////////////////////////////////////////////////////////////////////////////////
 
 func (o *Options) GetManager() ctrl.Manager {
-	return o.mgr
+	return o.mgmt.Manager
+}
+
+func (o *Options) ControllerManagerContext() *ControllerManagerContext {
+	return &o.mgmt
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+type ControllerManagerContext struct {
+	ctrl.Manager
+	clusterutils.Clusters
+}
+
+func (m *ControllerManagerContext) NewController() *ctrl.Builder {
+	return ctrl.NewControllerManagedBy(m.Manager)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+func GetManagementContext(opts flagutils.OptionSetProvider) *ControllerManagerContext {
+	return From(opts).ControllerManagerContext()
 }

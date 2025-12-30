@@ -22,6 +22,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the kubedns itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- coredns_corednsentry_admin_role.yaml
+- coredns_corednsentry_editor_role.yaml
+- coredns_corednsentry_viewer_role.yaml
 - coredns_hostedzone_admin_role.yaml
 - coredns_hostedzone_editor_role.yaml
 - coredns_hostedzone_viewer_role.yaml

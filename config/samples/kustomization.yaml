@@ -1,4 +1,5 @@
 ## Append samples of your project ##
 resources:
 - coredns_v1alpha1_hostedzone.yaml
+- coredns_v1alpha1_corednsentry.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

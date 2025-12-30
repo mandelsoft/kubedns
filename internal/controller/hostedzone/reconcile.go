@@ -50,7 +50,7 @@ func (r *ReconcileRequest) Reconcile() error {
 	obj := r.instance
 
 	// check responsibility
-	ok, root, err := r.IsResponsibileFor()
+	ok, root, err := r.IsResponsibile()
 	if !ok || err != nil {
 		if !ok {
 			r.Info("not responsible for this zone")
@@ -158,7 +158,7 @@ func (r *ReconcileRequest) ChangedResponsibility() bool {
 	return false
 }
 
-func (r *ReconcileRequest) IsResponsibileFor() (bool, *Responsibility, error) {
+func (r *ReconcileRequest) IsResponsibile() (bool, *Responsibility, error) {
 	obj := r.instance
 	if obj == nil {
 		return true, nil, nil

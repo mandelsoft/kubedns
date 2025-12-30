@@ -1,0 +1,9 @@
+apiVersion: coredns.mandelsoft.org/v1alpha1
+kind: CoreDNSEntry
+metadata:
+  labels:
+    app.kubernetes.io/name: kubedns
+    app.kubernetes.io/managed-by: kustomize
+  name: corednsentry-sample
+spec:
+  # TODO(user): Add fields here

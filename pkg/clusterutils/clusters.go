@@ -12,6 +12,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 )
 
+const DEFAULT = "default"
+
+func From(opts flagutils.OptionSetProvider) Definitions {
+	return flagutils.GetFrom[Definitions](opts)
+}
+
 type DefinitionProvider interface {
 	GetDefinition() Definition
 }
@@ -38,7 +44,7 @@ type definition struct {
 var _ Definition = (*definition)(nil)
 
 func NewDefinition(name string, desc string) Definition {
-	return &definition{name: name, desc: desc}
+	return &definition{name: name, desc: desc, fallback: DEFAULT}
 }
 
 func (d *definition) WithFallback(fallback string) Definition {
@@ -77,6 +83,8 @@ type Definitions interface {
 	flagutils.Options
 	flagutils.Validatable
 
+	WithScheme(scheme *runtime.Scheme) Definitions
+	Add(def Definition) Definitions
 	GetClusters() Clusters
 }
 
@@ -96,6 +104,16 @@ func NewDefinitions() Definitions {
 		definitions: make(map[string]Definition),
 		opts:        map[string]*kubeconfigopts.Options{},
 	}
+}
+
+func (d *definitions) Add(def Definition) Definitions {
+	d.definitions[def.GetName()] = def
+	return d
+}
+
+func (d *definitions) WithScheme(scheme *runtime.Scheme) Definitions {
+	d.scheme = scheme
+	return d
 }
 
 func (d *definitions) AddFlags(fs *pflag.FlagSet) {
@@ -145,26 +163,27 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 						d.clusters.Add(NewAlias(n, eff))
 						found = true
 					} else {
-						if fb == "default" {
+						if fb == DEFAULT {
 							err := d.main.Validate(ctx, opts, v)
 							if err != nil {
 								return err
 							}
-							cluster, err := d.newCluster("default", nil, d.main.GetRestConfig())
+							cluster, err := d.newCluster(DEFAULT, d.scheme, d.main.GetRestConfig())
 							if err != nil {
 								return err
 							}
 							d.clusters.Add(cluster)
+							found = true
 						}
 						missing = true
 					}
 				}
 			}
-			if missing {
-				for n, _ := range d.definitions {
-					if d.clusters.Get(n) == nil {
-						return fmt.Errorf("kubeconfig for cluster %q required", n)
-					}
+		}
+		if missing {
+			for n, _ := range d.definitions {
+				if d.clusters.Get(n) == nil {
+					return fmt.Errorf("kubeconfig for cluster %q required", n)
 				}
 			}
 		}
@@ -183,14 +202,22 @@ func (d *definitions) newCluster(name string, scheme *runtime.Scheme, cfg *rest.
 }
 
 func (d *definitions) GetClusters() Clusters {
-	// TODO implement me
-	panic("implement me")
+	return d.clusters
+}
+
+func ValidatedClusters(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) (Clusters, error) {
+	defs, err := flagutils.ValidatedOptions[Definitions](ctx, opts, v)
+	if err != nil {
+		return nil, err
+	}
+	return defs.GetClusters(), nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 type Clusters interface {
 	Get(name string) Cluster
+	Clusters(yield func(Cluster) bool)
 
 	Add(c Cluster)
 }
@@ -207,6 +234,14 @@ func NewClusters() Clusters {
 
 func (c *clusters) Get(name string) Cluster {
 	return c.clusters[name]
+}
+
+func (c *clusters) Clusters(yield func(Cluster) bool) {
+	for _, c := range c.clusters {
+		if !yield(c) {
+			return
+		}
+	}
 }
 
 func (c *clusters) Add(cluster Cluster) {

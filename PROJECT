@@ -19,4 +19,13 @@ resources:
   kind: HostedZone
   path: github.com/mandelsoft/kubedns/api/coredns/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: mandelsoft.org
+  group: coredns
+  kind: CoreDNSEntry
+  path: github.com/mandelsoft/kubedns/api/coredns/v1alpha1
+  version: v1alpha1
 version: "3"

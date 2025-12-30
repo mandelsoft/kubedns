@@ -58,7 +58,7 @@ func TestRenderManifests() error {
 	ctx.Simulate = true
 
 	r := &HostedZoneReconciler{
-		Options: NewOptions(nil),
+		Options: NewOptions(),
 	}
 	values, err := ctx.Values(NewLocalMode(r), false)
 	if err != nil {
