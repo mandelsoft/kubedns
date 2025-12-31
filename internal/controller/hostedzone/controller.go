@@ -28,9 +28,11 @@ import (
 	"github.com/mandelsoft/kubedns/pkg/index"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/logging"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -56,10 +58,12 @@ type HostedZoneReconciler struct {
 
 	Manifests map[string][]byte
 
-	Options      *Options
-	Runtime      clusterutils.Cluster
+	Options *Options
+	Runtime clusterutils.Cluster
+
 	runtimeOwner owner.OwnerHandler
 	dns          DNSHandler
+	recorder     record.EventRecorder
 
 	index index.UntypedIndex
 }
@@ -170,14 +174,17 @@ func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.L
 }
 
 func (r *HostedZoneReconciler) UpdateCondition(ctx context.Context, logger logging.Logger, instance *corednsv1alpha1.HostedZone, c metav1.Condition, mod ...bool) (bool, error) {
-	m := false
+	conditions := &instance.Status.Conditions
+	m := meta.SetStatusCondition(conditions, c)
+	if m {
+		r.recorder.Eventf(instance, corev1.EventTypeNormal, c.Type, c.Message)
+	}
+
 	for _, v := range mod {
 		m = v || m
 	}
 
-	conditions := &instance.Status.Conditions
-
-	if meta.SetStatusCondition(conditions, c) || m {
+	if m {
 		logger.Info("status needs update")
 		if err := r.DataPlane.Status().Update(ctx, instance); err != nil {
 			return false, fmt.Errorf("failed to update status after successful validation: %w", err)

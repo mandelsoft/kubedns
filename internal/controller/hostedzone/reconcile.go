@@ -64,8 +64,10 @@ func (r *ReconcileRequest) Reconcile() Problem {
 	if obj == nil || r.ChangedResponsibility() || !obj.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Handle Deletion
 		if obj == nil || !obj.ObjectMeta.DeletionTimestamp.IsZero() {
+			r.reconciler.recorder.Eventf(obj, corev1.EventTypeNormal, "Deleting", "Deleting hosted zone")
 			r.Info("deletion of object requested")
 		} else {
+			r.reconciler.recorder.Eventf(obj, corev1.EventTypeNormal, "ResponsibilityChanged", "Deleting because of responsibility change")
 			r.Info("responsibility changed", "parent", obj.Spec.ParentRef, "runtime", obj.Spec.Runtime, "class", obj.Spec.Class)
 		}
 		if obj == nil || controllerutil.ContainsFinalizer(obj, r.reconciler.Finalizer) {
@@ -263,8 +265,8 @@ func (r *ReconcileRequest) Update() error {
 	return nil
 }
 
-func (r *ReconcileRequest) ApplyData(octx clusterutils.OperationContext, data []byte) (*unstructured.Unstructured, error) {
-	o, err := clusterutils.ClientSideApply(r.reconciler.Runtime, octx, data)
+func (r *ReconcileRequest) ApplyData(octx clusterutils.OperationContext, data []byte, mod ...*clusterutils.ModificationInfo) (*unstructured.Unstructured, error) {
+	o, err := clusterutils.ClientSideApply(r.reconciler.Runtime, octx, data, mod...)
 	if err != nil {
 		meta.SetStatusCondition(&r.instance.Status.Conditions, metav1.Condition{
 			Type:    corednsv1alpha1.RuntimeConditionType,
@@ -303,16 +305,20 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 
 	r.Info("updating dataplane")
 
+	var modified clusterutils.ModificationInfo
 	for _, data := range dataplane {
-		_, err := clusterutils.ClientSideApply(r.reconciler.DataPlane, r, data)
+		_, err := clusterutils.ClientSideApply(r.reconciler.DataPlane, r, data, &modified)
 		if err != nil {
 			return TemporaryProblemf("error deploying dataplane: %s", err.Error())
 		}
 	}
+	modified.Report(r.reconciler.recorder, "Dataplane", r.instance)
 
 	// if credential access failed, retry the reconcilation
 	if repeat != nil {
 		r.Info("dataplane still pending: {{reason}} -> requeue", "reason", repeat.Error())
+		r.reconciler.recorder.Eventf(r.instance, corev1.EventTypeNormal, "DataplanePending", "Dataplane still pending")
+
 		return nil // tre-rigger by watch
 	}
 
@@ -333,8 +339,9 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		)
 
 		// apply standard manifests
+		modified.Clear()
 		for _, data := range runtime {
-			o, err := r.ApplyData(octx, data)
+			o, err := r.ApplyData(octx, data, &modified)
 			if err != nil {
 				if checkNotModifiableError(err) {
 					r.DeleteData(octx, data)
@@ -359,14 +366,17 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 				}
 			}
 		}
+		modified.Report(r.reconciler.recorder, "Runtime", r.instance)
 
 		// apply additional resources required by DNS provisioning for name servers
+		modified.Clear()
 		for _, data := range r.reconciler.Options.DNSHandler.Manifests(&dnsctx, values) {
-			_, err := r.ApplyData(octx, data)
+			_, err := r.ApplyData(octx, data, &modified)
 			if err != nil {
 				return TemporaryProblem(err)
 			}
 		}
+		modified.Report(r.reconciler.recorder, "DNSExtensions", r.instance)
 
 		var sum Problem
 		var deployment appsv1.Deployment
@@ -384,6 +394,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 				if ok {
 					reason = corednsv1alpha1.ReasonRuntimeDeploying
 				}
+				r.reconciler.recorder.Eventf(r.instance, corev1.EventTypeNormal, "Pending", "DNS server deployment still pending")
 			}
 			r.SetStatusCondition(metav1.Condition{
 				Type:    corednsv1alpha1.RuntimeConditionType,
@@ -422,6 +433,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 					ok = true
 				} else {
 					msg = "nameserver access still pending"
+					r.reconciler.recorder.Eventf(r.instance, corev1.EventTypeNormal, "Pending", "nameserver access still pending")
 				}
 			}
 			r.SetStatusCondition(metav1.Condition{
@@ -497,7 +509,11 @@ func (r *ReconcileRequest) SetStatusCondition(condition metav1.Condition) bool {
 	if condition.ObservedGeneration == 0 {
 		condition.ObservedGeneration = r.instance.Generation
 	}
-	return meta.SetStatusCondition(&r.instance.Status.Conditions, condition)
+	m := meta.SetStatusCondition(&r.instance.Status.Conditions, condition)
+	if m {
+		r.reconciler.recorder.Eventf(r.instance, corev1.EventTypeNormal, condition.Type, condition.Message)
+	}
+	return m
 }
 
 func GetAccessValues(in map[string]interface{}) map[string]interface{} {

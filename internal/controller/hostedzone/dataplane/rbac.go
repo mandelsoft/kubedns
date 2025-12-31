@@ -12,3 +12,5 @@ package dataplane
 // +kubebuilder:rbac:groups=coredns.mandelsoft.org,resources=corednsentries,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=coredns.mandelsoft.org,resources=corednsentries/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=coredns.mandelsoft.org,resources=corednsentries/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=coredns.mandelsoft.org,resources=corednsentrie,resources=events,verbs=create;patch

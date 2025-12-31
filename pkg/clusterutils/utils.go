@@ -4,14 +4,18 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/kubedns/pkg/merge"
 	"github.com/mandelsoft/kubedns/pkg/objutils"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
@@ -132,7 +136,41 @@ func ServerSideApply(c Cluster, ctx OperationContext, manifest []byte) error {
 	return nil
 }
 
-func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte) (*unstructured.Unstructured, error) {
+type ModificationInfo struct {
+	Created bool
+	Updated bool
+}
+
+func (m *ModificationInfo) Clear() {
+	m.Created = false
+	m.Updated = false
+}
+
+func (m *ModificationInfo) SetCreated() {
+	if m != nil {
+		m.Created = true
+	}
+}
+
+func (m *ModificationInfo) SetUpdated() {
+	if m != nil {
+		m.Updated = true
+	}
+}
+
+func (m *ModificationInfo) Report(recorder record.EventRecorder, typ string, obj runtime.Object) {
+	if m.Updated {
+		recorder.Eventf(obj, corev1.EventTypeNormal, typ+"Updated", typ+" has been updated")
+	} else {
+		if m.Created {
+			recorder.Eventf(obj, corev1.EventTypeNormal, typ+"Created", typ+" has been created")
+		}
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*ModificationInfo) (*unstructured.Unstructured, error) {
 	// 1. Decode bytes into a 'desired' unstructured object
 	desired := unstructured.Unstructured{}
 	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
@@ -156,6 +194,7 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte) (*unstruc
 	}, &current)
 
 	if errors.IsNotFound(err) {
+		general.Optional(mod...).SetCreated()
 		ctx.Info("creating resource", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind())
 		return &desired, c.Create(ctx, &desired, &client.CreateOptions{
 			// PATH A: Create if not found
@@ -206,7 +245,7 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte) (*unstruc
 
 		return &desired, nil // No changes, exit early
 	}
-
+	general.Optional(mod...).SetUpdated()
 	ctx.Info("apply patch", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind(), "patch", string(patchData))
 	return &desired, c.Patch(ctx, &current, rawPatch, &client.PatchOptions{
 		FieldManager: ctx.GetFieldManager(),

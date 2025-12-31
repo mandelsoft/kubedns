@@ -26,6 +26,8 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // HostedZoneSpec defines the desired state of HostedZone
+// +kubebuilder:validation:XValidation:rule="!(has(self.class) || has(self.runtime)) && has(self.parentRef)",message="Cannot set both class and/or runtime and parentRef"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.class) || self.class == oldSelf.class",message="class is immutable"
 type HostedZoneSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
@@ -46,26 +48,32 @@ type HostedZoneSpec struct {
 
 	// DomainNames is a set of domain names for the hosted zone.
 	// Formally, for every name a new DNS zone is managed.
+	// +kubebuilder:validation:MinItems=1
 	DomainNames []string `json:"domainNames"`
 
 	// EMail address of admins.
+	// +kubebuilder:validation:MinLength=1
 	EMail string `json:"email"`
 
 	// Refresh is the interval for secondaries to query to updates
+	// +kubebuilder:validation:Minimum=1
 	Refresh int `json:"refresh"`
 
 	// Retry time to repeat refresh.
+	// +kubebuilder:validation:Minimum=1
 	Retry int `json:"retry"`
 
 	// Expire is the maximal validity interval.
+	// +kubebuilder:validation:Minimum=1
 	Expire int `json:"expire"`
 
 	// MinmumTTL is the minimal live time.
+	// +kubebuilder:validation:Minimum=10
 	MinimumTTL int `json:"minimumTTL"`
 
 	// ParantRef is the name if a local hosted zone resource it is linked to.
 	// +optional
-	ParentRef string `json:"parentRef"`
+	ParentRef string `json:"parentRef,omitempty"`
 }
 
 type Observed struct {

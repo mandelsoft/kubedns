@@ -28,6 +28,7 @@ func Create(opts flagutils.OptionSetProvider) error {
 		Runtime:    mgmt.Get("runtime"),
 		index:      index.NewUntyped(),
 		Options:    From(opts),
+		recorder:   mgmt.GetEventRecorderFor("coredns.mandelsoft.org/hostedzone"),
 	}
 
 	if r.Options == nil {
