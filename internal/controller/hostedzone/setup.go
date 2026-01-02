@@ -35,7 +35,7 @@ func Create(opts flagutils.OptionSetProvider) error {
 		r.Options = NewOptions()
 	}
 
-	trigger, err := r.DataPlane.Source(&corednsv1alpha1.HostedZone{})
+	trigger, err := r.DataPlane.TriggerSource(&corednsv1alpha1.HostedZone{})
 	if err != nil {
 		return err
 	}

@@ -5,7 +5,7 @@ import (
 	"reflect"
 
 	"github.com/mandelsoft/goutils/generics"
-	"github.com/mandelsoft/kubedns/pkg/clusterutils"
+	clusterutils2 "github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -14,8 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-func MapOwnerToLocalRequestByObject[O, P client.Object](owner OwnerHandler, p clusterutils.SchemeProvider, obj P, log ...logging.Logger) handler.TypedMapFunc[O, reconcile.Request] {
-	gk, err := clusterutils.GKForObject(p, obj)
+func MapOwnerToLocalRequestByObject[O, P client.Object](owner OwnerHandler, p clusterutils2.SchemeProvider, obj P, log ...logging.Logger) handler.TypedMapFunc[O, reconcile.Request] {
+	gk, err := clusterutils2.GKForObject(p, obj)
 	if err != nil {
 		panic(err)
 	}
@@ -42,7 +42,7 @@ func MapOwnerToLocalRequest[O client.Object](owner OwnerHandler, kind schema.Gro
 	}
 }
 
-func WatchSourceForSlave[O, R client.Object](c clusterutils.Cluster, owner OwnerHandler, s clusterutils.SchemeProvider, log ...logging.Logger) source.Source {
+func WatchSourceForSlave[O, R client.Object](c clusterutils2.Cluster, owner OwnerHandler, s clusterutils2.SchemeProvider, log ...logging.Logger) source.Source {
 	// O,R are pointer types, but we need an object
 
 	o := reflect.New(generics.TypeOf[O]().Elem()).Interface().(O)
@@ -53,6 +53,6 @@ func WatchSourceForSlave[O, R client.Object](c clusterutils.Cluster, owner Owner
 
 }
 
-func AddOwnerModifier(handler OwnerHandler, owner client.Object) clusterutils.ObjectModifier {
+func AddOwnerModifier(handler OwnerHandler, owner client.Object) clusterutils2.ObjectModifier {
 	return func(obj client.Object) error { return handler.SetOwner(owner, obj) }
 }

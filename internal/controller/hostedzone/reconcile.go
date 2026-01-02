@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-test/deep"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/pkg/clusterutils"
 	. "github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
+	clusterutils2 "github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/kubedns/pkg/render"
 	"github.com/mandelsoft/logging"
@@ -34,7 +34,7 @@ type ReconcileRequest struct {
 	orig       *corednsv1alpha1.HostedZone
 }
 
-var _ clusterutils.OperationContext = (*ReconcileRequest)(nil)
+var _ clusterutils2.OperationContext = (*ReconcileRequest)(nil)
 
 func NewRequest(ctx context.Context, l logging.Logger, reconciler *HostedZoneReconciler, key client.ObjectKey, instance *corednsv1alpha1.HostedZone) *ReconcileRequest {
 	return &ReconcileRequest{
@@ -265,8 +265,8 @@ func (r *ReconcileRequest) Update() error {
 	return nil
 }
 
-func (r *ReconcileRequest) ApplyData(octx clusterutils.OperationContext, data []byte, mod ...*clusterutils.ModificationInfo) (*unstructured.Unstructured, error) {
-	o, err := clusterutils.ClientSideApply(r.reconciler.Runtime, octx, data, mod...)
+func (r *ReconcileRequest) ApplyData(octx clusterutils2.OperationContext, data []byte, mod ...*clusterutils2.ModificationInfo) (*unstructured.Unstructured, error) {
+	o, err := clusterutils2.ClientSideApply(r.reconciler.Runtime, octx, data, mod...)
 	if err != nil {
 		meta.SetStatusCondition(&r.instance.Status.Conditions, metav1.Condition{
 			Type:    corednsv1alpha1.RuntimeConditionType,
@@ -279,7 +279,7 @@ func (r *ReconcileRequest) ApplyData(octx clusterutils.OperationContext, data []
 	return o, err
 }
 
-func (r *ReconcileRequest) DeleteData(octx clusterutils.OperationContext, data []byte) Problem {
+func (r *ReconcileRequest) DeleteData(octx clusterutils2.OperationContext, data []byte) Problem {
 	return r.Delete(r.reconciler.Runtime, data)
 }
 
@@ -305,9 +305,9 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 
 	r.Info("updating dataplane")
 
-	var modified clusterutils.ModificationInfo
+	var modified clusterutils2.ModificationInfo
 	for _, data := range dataplane {
-		_, err := clusterutils.ClientSideApply(r.reconciler.DataPlane, r, data, &modified)
+		_, err := clusterutils2.ClientSideApply(r.reconciler.DataPlane, r, data, &modified)
 		if err != nil {
 			return TemporaryProblemf("error deploying dataplane: %s", err.Error())
 		}
@@ -331,7 +331,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		var svcName client.ObjectKey
 
 		r.Logger.Info("updating runtime")
-		octx := clusterutils.WithModification(r,
+		octx := clusterutils2.WithModification(r,
 			// set owners
 			owner.AddOwnerModifier(r.reconciler.runtimeOwner, r.instance),
 			// adapt to provide DNS records for nameservers
@@ -463,7 +463,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 	return nil
 }
 
-func (r *ReconcileRequest) Delete(cluster clusterutils.Cluster, manifest []byte) Problem {
+func (r *ReconcileRequest) Delete(cluster clusterutils2.Cluster, manifest []byte) Problem {
 	obj := unstructured.Unstructured{}
 	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	_, _, err := dec.Decode(manifest, nil, &obj)

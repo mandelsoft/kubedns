@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/kubedns/pkg/clusterutils"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubedns/pkg/options/metricsopts"
 	"github.com/mandelsoft/kubedns/pkg/options/tlsopts"
 	"github.com/mandelsoft/kubedns/pkg/options/webhookopts"
@@ -48,7 +48,7 @@ var (
 
 func New(main string, electionId string, configs ...ConfigurationProvider) *Options {
 	if main == "" {
-		main = clusterutils.DEFAULT
+		main = cluster.DEFAULT
 	}
 	nested := flagutils.DefaultOptionSet{}
 	nested = append(nested, tlsopts.New())
@@ -65,7 +65,7 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 		return err
 	}
 
-	o.mgmt.Clusters, err = clusterutils.ValidatedClusters(ctx, opts, v)
+	o.mgmt.Clusters, err = cluster.ValidatedClusters(ctx, opts, v)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (o *Options) ControllerManagerContext() *ControllerManagerContext {
 
 type ControllerManagerContext struct {
 	ctrl.Manager
-	clusterutils.Clusters
+	cluster.Clusters
 }
 
 func (m *ControllerManagerContext) NewController() *ctrl.Builder {

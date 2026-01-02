@@ -11,7 +11,7 @@ import (
 )
 
 type Mux interface {
-	Source(obj runtime.Object) (Enqueue, error)
+	TriggerSource(obj runtime.Object) (Enqueue, error)
 
 	EnqueueByGVK(gvk schema.GroupVersionKind, key client.ObjectKey)
 	EnqueueByObject(obj runtime.Object) error
@@ -27,7 +27,7 @@ func NewMux(scheme *runtime.Scheme) Mux {
 	return &mux{scheme: scheme, enqueues: make(map[schema.GroupVersionKind]Enqueue)}
 }
 
-func (m *mux) Source(obj runtime.Object) (Enqueue, error) {
+func (m *mux) TriggerSource(obj runtime.Object) (Enqueue, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 

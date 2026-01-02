@@ -4,7 +4,7 @@ import (
 	"context"
 
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/pkg/clusterutils"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -15,10 +15,10 @@ const IndexKeyEntryZone = "corednsentry.zone"
 type Reconciler struct {
 	logging.Logger
 	FieldManager string
-	DataPlane    clusterutils.Cluster
+	DataPlane    cluster.Cluster
 }
 
-func NewReconciler(logger logging.Logger, dataPlane clusterutils.Cluster, fieldManager string) *Reconciler {
+func NewReconciler(logger logging.Logger, dataPlane cluster.Cluster, fieldManager string) *Reconciler {
 	return &Reconciler{
 		Logger:       logger,
 		FieldManager: fieldManager,

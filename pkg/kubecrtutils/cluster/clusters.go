@@ -1,11 +1,13 @@
-package clusterutils
+package cluster
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/kubedns/pkg/options/kubeconfigopts"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster/restconfig"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/internal"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/kubeconfigopts"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -24,6 +26,10 @@ type DefinitionProvider interface {
 
 type Definition interface {
 	DefinitionProvider
+	flagutils.Options
+	flagutils.OptionSetProvider
+
+	GetConfig() (*rest.Config, error)
 
 	GetName() string
 	GetFallback() string
@@ -37,14 +43,18 @@ type Definition interface {
 type definition struct {
 	name     string
 	fallback string
+	rules    restconfig.Rules
 	desc     string
 	scheme   *runtime.Scheme
 }
 
 var _ Definition = (*definition)(nil)
 
-func NewDefinition(name string, desc string) Definition {
-	return &definition{name: name, desc: desc, fallback: DEFAULT}
+func NewDefinition(name string, desc string, rule ...restconfig.Rule) Definition {
+	if len(rule) == 0 {
+		rule = []restconfig.Rule{restconfig.DedicatedConfigRules(name, desc)}
+	}
+	return &definition{name: name, desc: desc, fallback: DEFAULT, rules: restconfig.NewRules(rule...)}
 }
 
 func (d *definition) WithFallback(fallback string) Definition {
@@ -77,37 +87,44 @@ func (d *definition) GetScheme() *runtime.Scheme {
 	return d.scheme
 }
 
+func (d *definition) GetConfig() (*rest.Config, error) {
+	return d.rules.GetConfig()
+}
+
+func (d *definition) AddFlags(fs *pflag.FlagSet) {
+	d.rules.AddFlags(fs)
+}
+
+func (d *definition) AsOptionSet() flagutils.OptionSet {
+	return d.rules.AsOptionSet()
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 type Definitions interface {
-	flagutils.Options
+	internal.Definitions[Definition, Definitions]
 	flagutils.Validatable
 
 	WithScheme(scheme *runtime.Scheme) Definitions
-	Add(def Definition) Definitions
+	GetError() error
+
 	GetClusters() Clusters
 }
 
 type definitions struct {
-	scheme      *runtime.Scheme
-	main        *kubeconfigopts.Options
-	opts        map[string]*kubeconfigopts.Options
-	definitions map[string]Definition
-	clusters    Clusters
+	internal.DefinitionsImpl[Definition, Definitions]
+	scheme   *runtime.Scheme
+	main     *kubeconfigopts.Options
+	clusters Clusters
 }
 
 var _ Definitions = (*definitions)(nil)
 
 func NewDefinitions() Definitions {
-	return &definitions{
-		main:        kubeconfigopts.New("standard kubeconfig"),
-		definitions: make(map[string]Definition),
-		opts:        map[string]*kubeconfigopts.Options{},
+	d := &definitions{
+		main: kubeconfigopts.New(),
 	}
-}
-
-func (d *definitions) Add(def Definition) Definitions {
-	d.definitions[def.GetName()] = def
+	d.DefinitionsImpl = internal.NewDefinitions[Definition, Definitions]("cluster", d)
 	return d
 }
 
@@ -118,41 +135,38 @@ func (d *definitions) WithScheme(scheme *runtime.Scheme) Definitions {
 
 func (d *definitions) AddFlags(fs *pflag.FlagSet) {
 	d.main.AddFlags(fs)
-
-	for n, def := range d.definitions {
-		o := d.opts[n]
-		if o == nil {
-			o = kubeconfigopts.New(fmt.Sprintf("kubeconfig for logical cluster %q: %s", n, def.GetDescription()), n)
-			d.opts[n] = o
-		}
-		o.AddFlags(fs)
-	}
+	d.DefinitionsImpl.AddFlags(fs)
 }
 
 func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
-	if d.clusters == nil {
-		d.clusters = NewClusters()
-		for n, def := range d.definitions {
-			o := d.opts[n]
-			if o.KubeConfig != "" {
-				err := o.Validate(ctx, opts, v)
-				if err != nil {
-					return err
-				}
-				cluster, err := d.newCluster(def.GetName(), def.GetScheme(), o.GetRestConfig())
-				if err != nil {
-					return err
-				}
-				d.clusters.Add(cluster)
-			}
+	if d.clusters == nil && d.GetError() == nil {
+		err := v.ValidateSet(ctx, opts, &d.DefinitionsImpl)
+		if err != nil {
+			return err
 		}
+		d.clusters = NewClusters()
+
 		missing := true
 		found := true
 		for missing && found {
 			missing = false
 			found = false
-			for n, def := range d.definitions {
+			for n, def := range d.Elements {
 				if d.clusters.Get(n) == nil {
+					cfg, err := def.GetConfig()
+					if err != nil {
+						return fmt.Errorf("cluster %s: %w", n, err)
+					}
+					if cfg != nil {
+						cluster, err := d.newCluster(def.GetName(), def.GetScheme(), cfg)
+						if err != nil {
+							return err
+						}
+						found = true
+						d.clusters.Add(cluster)
+						continue
+					}
+
 					fb := def.GetFallback()
 					if fb == "" {
 						missing = true
@@ -164,11 +178,18 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 						found = true
 					} else {
 						if fb == DEFAULT {
-							err := d.main.Validate(ctx, opts, v)
+							err := v.Validate(ctx, opts, d.main)
 							if err != nil {
 								return err
 							}
-							cluster, err := d.newCluster(DEFAULT, d.scheme, d.main.GetRestConfig())
+							cfg, err := d.main.GetConfig()
+							if err != nil {
+								return err
+							}
+							if cfg == nil {
+								return fmt.Errorf("no default kubeconfig found, use option --kubeconfig")
+							}
+							cluster, err := d.newCluster(DEFAULT, d.scheme, cfg)
 							if err != nil {
 								return err
 							}
@@ -181,14 +202,14 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 			}
 		}
 		if missing {
-			for n, _ := range d.definitions {
+			for n, _ := range d.Elements {
 				if d.clusters.Get(n) == nil {
 					return fmt.Errorf("kubeconfig for cluster %q required", n)
 				}
 			}
 		}
 	}
-	return nil
+	return d.GetError()
 }
 
 func (d *definitions) newCluster(name string, scheme *runtime.Scheme, cfg *rest.Config) (Cluster, error) {

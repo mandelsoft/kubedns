@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/kubedns/pkg/clusterutils"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubedns/pkg/options/manageropts"
 	"github.com/spf13/pflag"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -42,7 +42,7 @@ func NewOptions() *Options {
 func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	var err error
 
-	clusters, err := clusterutils.ValidatedClusters(ctx, opts, v)
+	clusters, err := cluster.ValidatedClusters(ctx, opts, v)
 	if err != nil {
 		return err
 	}

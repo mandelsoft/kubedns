@@ -1,50 +1,44 @@
-package controllerutils
+package cluster
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/mandelsoft/goutils/sliceutils"
-	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ObjectPointer[P any] interface {
-	runtime.Object
-	*P
-}
+type Lister func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error
 
-type Indexer[T any, P ObjectPointer[T]] func(obj P) []string
-
-type Index[T any, P ObjectPointer[T]] interface {
-}
-
-type _index[T any, P ObjectPointer[T]] struct {
-	cluster     cluster.Cluster
+type index struct {
 	name        string
+	cluster     Cluster
 	listFactory func() (client.ObjectList, error)
 }
 
-func NewIndex[T any, P ObjectPointer[T]](cluster cluster.Cluster, name string, indexer Indexer[T, P]) (Index[T, P], error) {
-	if err := cluster.GetFieldIndexer().IndexField(context.Background(), &corednsv1alpha1.CoreDNSEntry{}, name, func(rawObj client.Object) []string {
-		res := rawObj.(P)
-		return indexer(res)
-	}); err != nil {
-		return nil, err
-	}
-	var proto T
-	fac, err := CreateListFactoryFromObject(cluster.GetScheme(), any(&proto).(runtime.Object))
+func NewDefaultIndex(name string, cluster Cluster, proto runtime.Object) (Index, error) {
+	fac, err := createListFactoryFromObject(cluster.GetScheme(), proto)
 	if err != nil {
 		return nil, err
 	}
-	return &_index[T, P]{cluster: cluster, name: name, listFactory: fac}, nil
+	return &index{
+		name:        name,
+		cluster:     cluster,
+		listFactory: fac,
+	}, nil
 }
 
-func (i *_index[T, P]) Get(ctx context.Context, namespace, key string) ([]T, error) {
+func (i *index) GetName() string {
+	return i.name
+}
+
+func (i *index) GetCluster() Cluster {
+	return i.cluster
+}
+
+func (i *index) GetList(ctx context.Context, namespace, key string) (client.ObjectList, error) {
 	list, err := i.listFactory()
 	if err != nil {
 		return nil, err
@@ -53,15 +47,22 @@ func (i *_index[T, P]) Get(ctx context.Context, namespace, key string) ([]T, err
 	if err != nil {
 		return nil, err
 	}
-
-	items, err := meta.ExtractList(list)
-	if err != nil {
-		return nil, err
-	}
-	return sliceutils.Convert[T](items), nil
+	return list, nil
 }
 
-func CreateListFromObject(scheme *runtime.Scheme, obj runtime.Object) (client.ObjectList, error) {
+func (i *index) ForEachListItem(ctx context.Context, namespace, key string, action func(object runtime.Object) error) error {
+	list, err := i.GetList(ctx, namespace, key)
+	if err != nil {
+		return err
+	}
+	return meta.EachListItem(list, action)
+}
+
+func (i *index) Trigger(ctx context.Context, namespace, key string) error {
+	return i.ForEachListItem(ctx, namespace, key, i.cluster.EnqueueByObject)
+}
+
+func createListFromObject(scheme *runtime.Scheme, obj runtime.Object) (client.ObjectList, error) {
 	// 1. Get the GVK for the prototype object
 	gvks, _, err := scheme.ObjectKinds(obj)
 	if err != nil || len(gvks) == 0 {
@@ -85,7 +86,7 @@ func CreateListFromObject(scheme *runtime.Scheme, obj runtime.Object) (client.Ob
 	return listObj.(client.ObjectList), nil
 }
 
-func CreateListFactoryFromObject(scheme *runtime.Scheme, obj runtime.Object) (func() (client.ObjectList, error), error) {
+func createListFactoryFromObject(scheme *runtime.Scheme, obj runtime.Object) (func() (client.ObjectList, error), error) {
 	// 1. Get the GVK for the prototype object
 	gvks, _, err := scheme.ObjectKinds(obj)
 	if err != nil || len(gvks) == 0 {

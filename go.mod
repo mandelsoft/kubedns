@@ -7,7 +7,7 @@ require (
 	github.com/go-test/deep v1.1.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/lestrrat-go/jwx/v2 v2.1.6
-	github.com/mandelsoft/flagutils v0.0.0-20251211184759-cfe426a435e9
+	github.com/mandelsoft/flagutils v0.0.0-20260102151554-dee4ad9646e3
 	github.com/mandelsoft/goutils v0.0.0-20251108170156-7404c5a2417e
 	github.com/mandelsoft/logging v0.0.0-20240618075559-fdca28a87b0a
 	github.com/mandelsoft/spiff v1.3.0-beta-7.0.20251217160149-636218617943

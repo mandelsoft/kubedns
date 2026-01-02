@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/mandelsoft/kubedns/internal/controller/common"
-	"github.com/mandelsoft/kubedns/pkg/clusterutils"
 	. "github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
 	"github.com/mandelsoft/kubedns/pkg/index"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/logging"
 	corev1 "k8s.io/api/core/v1"
@@ -59,7 +59,7 @@ type HostedZoneReconciler struct {
 	Manifests map[string][]byte
 
 	Options *Options
-	Runtime clusterutils.Cluster
+	Runtime cluster.Cluster
 
 	runtimeOwner owner.OwnerHandler
 	dns          DNSHandler

@@ -22,7 +22,7 @@ func Create(opts flagutils.OptionSetProvider) error {
 	r.Logger = Log
 	r.Info("using dataplane cluster", "apiserver", r.DataPlane.GetConfig().Host)
 
-	trigger, err := r.DataPlane.Source(&corednsv1alpha1.HostedZone{})
+	trigger, err := r.DataPlane.TriggerSource(&corednsv1alpha1.HostedZone{})
 	if err != nil {
 		return err
 	}

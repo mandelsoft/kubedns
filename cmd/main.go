@@ -1,28 +1,11 @@
-/*
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package main
 
 import (
 	"os"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/kubedns/pkg/clusterutils"
-
 	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubedns/pkg/options/manageropts"
 	"github.com/mandelsoft/kubedns/pkg/setup"
 
@@ -47,19 +30,19 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(corednsv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
 // nolint:gocyclo
 func main() {
+
 	options := flagutils.DefaultOptionSet{}
 
 	options.Add(
-		clusterutils.NewDefinitions().WithScheme(scheme).
-			Add(clusterutils.NewDefinition("dataplane", "user facing configuration dataplane")).
-			Add(clusterutils.NewDefinition("runtime", "runtime cluster").WithFallback("dataplane")),
+		cluster.NewDefinitions().WithScheme(scheme).
+			Add(cluster.NewDefinition("dataplane", "user facing configuration dataplane")).
+			Add(cluster.NewDefinition("runtime", "runtime cluster").WithFallback("dataplane")),
 
 		// zapopts.New(&zap.Options{
 		//	Development: true,

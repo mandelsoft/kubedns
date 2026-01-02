@@ -1,43 +1,31 @@
-package clusterutils
+package cluster
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
-	"github.com/mandelsoft/kubedns/pkg/enqueue"
+	"github.com/mandelsoft/goutils/general"
+	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/enqueue"
 	"github.com/mandelsoft/kubedns/pkg/merge"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 )
 
-type SchemeProvider interface {
-	GetScheme() *runtime.Scheme
-}
-
-type Cluster interface {
-	cluster.Cluster
-	client.Client
-	enqueue.Mux
-
-	GetName() string
-	GetEffective() Cluster
-	GetCluster() cluster.Cluster
-	GetTypeConverter() managedfields.TypeConverter
-
-	IsSameAs(Cluster) bool
-}
-
 type _cluster struct {
+	lock sync.Mutex
 	cluster.Cluster
 	client.Client
 	enqueue.Mux
 	name      string
 	converter managedfields.TypeConverter
 	start     sync.Once
+	indices   map[string]Index
 }
 
 var _ SchemeProvider = (*_cluster)(nil)
@@ -58,7 +46,7 @@ func (c *_alias) GetName() string {
 	return c.name
 }
 
-func NewClusterForCluster(name string, c cluster.Cluster) Cluster {
+func NewClusterForCRTCluster(name string, c cluster.Cluster) Cluster {
 	conv, err := merge.NewConverterV3(c.GetConfig())
 	if err != nil {
 		return nil
@@ -69,6 +57,7 @@ func NewClusterForCluster(name string, c cluster.Cluster) Cluster {
 		name:      name,
 		converter: conv,
 		Mux:       enqueue.NewMux(c.GetScheme()),
+		indices:   map[string]Index{},
 	}
 }
 
@@ -148,4 +137,49 @@ type cacheWrapper struct {
 // to setup the implicit cluster always created by the manager.
 func (w *cacheWrapper) Start(ctx context.Context) error {
 	return w.cluster.Start(ctx)
+}
+
+func (c *_cluster) GetIndex(name string) Index {
+	return c.indices[name]
+}
+
+func (c *_cluster) CreateIndex(ctx context.Context, name string, proto client.Object, indexer client.IndexerFunc, wrap ...func(cluster Cluster, name string) (Index, error)) (Index, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.indices[name] != nil {
+		return nil, fmt.Errorf("index %q already defined", name)
+	}
+	err := c.GetFieldIndexer().IndexField(ctx, proto, name, indexer)
+	if err != nil {
+		return nil, err
+	}
+
+	var idx Index
+
+	w := general.Optional(wrap...)
+	if w != nil {
+		idx, err = w(c, name)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		idx, err = NewDefaultIndex(name, c, proto)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	c.indices[name] = idx
+	return idx, nil
+}
+
+func (c *_cluster) ApplyTrigger(builder *ctrl.Builder) error {
+	trigger, err := c.TriggerSource(&corednsv1alpha1.HostedZone{})
+
+	if err != nil {
+		return err
+	}
+	builder.WatchesRawSource(trigger)
+	return nil
 }

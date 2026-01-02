@@ -129,6 +129,14 @@ github.com/mandelsoft/filepath v0.0.0-20240223090642-3e2777258aa3 h1:oo9nIgnyiBg
 github.com/mandelsoft/filepath v0.0.0-20240223090642-3e2777258aa3/go.mod h1:LxhqC7khDoRENwooP6f/vWvia9ivj6TqLYrR39zqkN0=
 github.com/mandelsoft/flagutils v0.0.0-20251211184759-cfe426a435e9 h1:ewR7v1/imP9G16hcEV97pXxEVEfAorXEhqMLj4BexaM=
 github.com/mandelsoft/flagutils v0.0.0-20251211184759-cfe426a435e9/go.mod h1:q6tapbMOcHtQS0JLecIdvI0KxRUQfMqjE9OUi/V1oT8=
+github.com/mandelsoft/flagutils v0.0.0-20260102142335-13684e77022b h1:eDDeH9GaGyob8la1QDUFu+okpt8NoiZjBzQVVajnQDU=
+github.com/mandelsoft/flagutils v0.0.0-20260102142335-13684e77022b/go.mod h1:q6tapbMOcHtQS0JLecIdvI0KxRUQfMqjE9OUi/V1oT8=
+github.com/mandelsoft/flagutils v0.0.0-20260102145702-6fdd50da2f14 h1:RtS1Q53RyxwX99oQnqzYcpjOk5Mdw6y/jEYG1u0bf/k=
+github.com/mandelsoft/flagutils v0.0.0-20260102145702-6fdd50da2f14/go.mod h1:q6tapbMOcHtQS0JLecIdvI0KxRUQfMqjE9OUi/V1oT8=
+github.com/mandelsoft/flagutils v0.0.0-20260102150843-596a36d5f76b h1:2KHa1EjEXQlj3naW5eS8+1itrTVkSK3adSGx4bkP3Bo=
+github.com/mandelsoft/flagutils v0.0.0-20260102150843-596a36d5f76b/go.mod h1:q6tapbMOcHtQS0JLecIdvI0KxRUQfMqjE9OUi/V1oT8=
+github.com/mandelsoft/flagutils v0.0.0-20260102151554-dee4ad9646e3 h1:uYAEDixVwZO6fLcNnGPmEpgqSMTD2cTjh+Kp9QFzxZg=
+github.com/mandelsoft/flagutils v0.0.0-20260102151554-dee4ad9646e3/go.mod h1:q6tapbMOcHtQS0JLecIdvI0KxRUQfMqjE9OUi/V1oT8=
 github.com/mandelsoft/goutils v0.0.0-20251108170156-7404c5a2417e h1:2UFwqNZcancrR0kj9/k6tR6zspQOLl1x7H5MWJ5KWjg=
 github.com/mandelsoft/goutils v0.0.0-20251108170156-7404c5a2417e/go.mod h1:fTCyGFCMm+ugUn1FqcHeWelCjoSYtkJaqnJvSmgkx1M=
 github.com/mandelsoft/logging v0.0.0-20240618075559-fdca28a87b0a h1:MAvh0gbP2uwKmf7wWCkYCzrYa6vPjBvYeGhoUlVHwtI=
