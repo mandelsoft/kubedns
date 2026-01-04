@@ -6,30 +6,26 @@ import (
 
 	"github.com/mandelsoft/goutils/sliceutils"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ObjectPointer[P any] interface {
-	runtime.Object
-	*P
+type Indexer[T any, P kubecrtutils.ObjectPointer[T]] func(obj P) []string
+
+type Index[T any, P kubecrtutils.ObjectPointer[T]] interface {
 }
 
-type Indexer[T any, P ObjectPointer[T]] func(obj P) []string
-
-type Index[T any, P ObjectPointer[T]] interface {
-}
-
-type _index[T any, P ObjectPointer[T]] struct {
-	cluster     cluster.Cluster
+type _index[T any, P kubecrtutils.ObjectPointer[T]] struct {
+	cluster     types.Cluster
 	name        string
 	listFactory func() (client.ObjectList, error)
 }
 
-func NewIndex[T any, P ObjectPointer[T]](cluster cluster.Cluster, name string, indexer Indexer[T, P]) (Index[T, P], error) {
+func NewIndex[T any, P kubecrtutils.ObjectPointer[T]](cluster types.Cluster, name string, indexer Indexer[T, P]) (Index[T, P], error) {
 	if err := cluster.GetFieldIndexer().IndexField(context.Background(), &corednsv1alpha1.CoreDNSEntry{}, name, func(rawObj client.Object) []string {
 		res := rawObj.(P)
 		return indexer(res)

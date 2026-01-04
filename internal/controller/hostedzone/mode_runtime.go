@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	. "github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
+	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"

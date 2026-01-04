@@ -30,10 +30,10 @@ func GetConfig(path string, context string) (*rest.Config, error) {
 		&clientcmd.ConfigOverrides{CurrentContext: context}).ClientConfig()
 }
 
-func GetRestConfigFromKubeconfig(apiConfig *api.Config, ctx ...string) (*rest.Config, error) {
+func GetRestConfigFromKubeconfig(apiConfig *api.Config, overrides ...*clientcmd.ConfigOverrides) (*rest.Config, error) {
 	// 1. Create a ClientConfig object from the api.Config
 	// We use NewDefaultClientConfig to respect the "current-context" in the struct.
-	clientConfig := clientcmd.NewDefaultClientConfig(*apiConfig, &clientcmd.ConfigOverrides{CurrentContext: general.Optional(ctx...)})
+	clientConfig := clientcmd.NewDefaultClientConfig(*apiConfig, general.OptionalDefaulted(&clientcmd.ConfigOverrides{}, overrides...))
 
 	// 2. Convert it to a rest.Config
 	restConfig, err := clientConfig.ClientConfig()
@@ -44,7 +44,7 @@ func GetRestConfigFromKubeconfig(apiConfig *api.Config, ctx ...string) (*rest.Co
 	return restConfig, nil
 }
 
-func TryKubeconfigFile(path string, ctx ...string) (*rest.Config, error) {
+func TryKubeconfigFile(path string, opts *clientcmd.ConfigOverrides) (*rest.Config, error) {
 	config, err := clientcmd.LoadFromFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -52,5 +52,5 @@ func TryKubeconfigFile(path string, ctx ...string) (*rest.Config, error) {
 		}
 		return nil, fmt.Errorf("kubeconfig file %s: %w", path, err)
 	}
-	return GetRestConfigFromKubeconfig(config)
+	return GetRestConfigFromKubeconfig(config, opts)
 }

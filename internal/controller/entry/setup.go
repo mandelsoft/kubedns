@@ -7,7 +7,7 @@ import (
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
-	"github.com/mandelsoft/kubedns/pkg/options/manageropts"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/manageropts"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

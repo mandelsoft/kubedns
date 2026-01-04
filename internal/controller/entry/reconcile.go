@@ -9,7 +9,7 @@ import (
 
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
-	"github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubedns/pkg/objutils"
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/api/errors"

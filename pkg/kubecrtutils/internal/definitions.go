@@ -2,8 +2,6 @@ package internal
 
 import (
 	"fmt"
-	"maps"
-	"sync"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/errors"
@@ -20,22 +18,19 @@ type Definitions[T Named, D any] interface {
 }
 
 type DefinitionsImpl[T Named, D any] struct {
-	sync.Mutex
-	self     D
-	typename string
-	options  flagutils.DefaultOptionSet
-	elements map[string]T
-	errlist  *errors.ErrorList
+	_group[T]
+	self    D
+	options flagutils.DefaultOptionSet
+	errlist *errors.ErrorList
 }
 
 var _ Definitions[Named, any] = (*DefinitionsImpl[Named, any])(nil)
 
 func NewDefinitions[T Named, D any](typ string, self D) DefinitionsImpl[T, D] {
 	return DefinitionsImpl[T, D]{
-		self:     self,
-		typename: typ,
-		elements: map[string]T{},
-		errlist:  errors.ErrListf("%s definitions", typ),
+		_group:  newGroup[T](typ),
+		self:    self,
+		errlist: errors.ErrListf("%s definitions", typ),
 	}
 }
 
@@ -57,32 +52,9 @@ func (d *DefinitionsImpl[T, D]) Add(elems ...T) D {
 	return d.self
 }
 
-func (d *DefinitionsImpl[T, D]) Get(name string) T {
-	defer d.Lock()()
-	return d.elements[name]
-}
-
 func (d *DefinitionsImpl[T, D]) GetError() error {
 	defer d.Lock()()
 	return d.errlist.Result()
-}
-
-func (d *DefinitionsImpl[T, D]) Elements(yield func(string, T) bool) {
-	d.Mutex.Lock()
-	m := maps.Clone(d.elements)
-	d.Mutex.Unlock()
-	for n, elem := range m {
-		if !yield(n, elem) {
-			return
-		}
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func (d *DefinitionsImpl[T, D]) Lock() func() {
-	d.Mutex.Lock()
-	return d.Unlock
 }
 
 ////////////////////////////////////////////////////////////////////////////////

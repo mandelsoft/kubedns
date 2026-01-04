@@ -15,6 +15,7 @@ require (
 	github.com/onsi/gomega v1.38.2
 	github.com/spf13/pflag v1.0.10
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
+	golang.org/x/net v0.47.0
 	k8s.io/api v0.35.0
 	k8s.io/apimachinery v0.35.0
 	k8s.io/client-go v0.35.0
@@ -33,6 +34,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
+	github.com/drone/envsubst v1.0.3 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -96,7 +98,6 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.44.0 // indirect
 	golang.org/x/mod v0.29.0 // indirect
-	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect

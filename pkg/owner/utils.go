@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/mandelsoft/goutils/generics"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils"
 	clusterutils2 "github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -15,7 +16,7 @@ import (
 )
 
 func MapOwnerToLocalRequestByObject[O, P client.Object](owner OwnerHandler, p clusterutils2.SchemeProvider, obj P, log ...logging.Logger) handler.TypedMapFunc[O, reconcile.Request] {
-	gk, err := clusterutils2.GKForObject(p, obj)
+	gk, err := kubecrtutils.GKForObject(p, obj)
 	if err != nil {
 		panic(err)
 	}

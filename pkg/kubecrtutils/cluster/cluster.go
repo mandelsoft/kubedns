@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/mandelsoft/goutils/general"
-	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/enqueue"
 	"github.com/mandelsoft/kubedns/pkg/merge"
 	"k8s.io/apimachinery/pkg/util/managedfields"
@@ -75,6 +74,7 @@ func NewCluster(name string, config *rest.Config, opts ...cluster.Option) (Clust
 		Client:    c.GetClient(),
 		name:      name,
 		converter: conv,
+		indices:   map[string]Index{},
 		Mux:       enqueue.NewMux(c.GetScheme()),
 	}, nil
 }
@@ -174,8 +174,8 @@ func (c *_cluster) CreateIndex(ctx context.Context, name string, proto client.Ob
 	return idx, nil
 }
 
-func (c *_cluster) ApplyTrigger(builder *ctrl.Builder) error {
-	trigger, err := c.TriggerSource(&corednsv1alpha1.HostedZone{})
+func (c *_cluster) ApplyTrigger(builder *ctrl.Builder, proto client.Object) error {
+	trigger, err := c.TriggerSource(proto)
 
 	if err != nil {
 		return err

@@ -6,7 +6,7 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
-	"github.com/mandelsoft/kubedns/pkg/options/manageropts"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/manageropts"
 	"github.com/mandelsoft/kubedns/pkg/setup"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)

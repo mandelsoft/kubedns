@@ -50,7 +50,7 @@ func (i *index) GetList(ctx context.Context, namespace, key string) (client.Obje
 	return list, nil
 }
 
-func (i *index) ForEachListItem(ctx context.Context, namespace, key string, action func(object runtime.Object) error) error {
+func (i *index) ForEachItem(ctx context.Context, namespace, key string, action func(object runtime.Object) error) error {
 	list, err := i.GetList(ctx, namespace, key)
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (i *index) ForEachListItem(ctx context.Context, namespace, key string, acti
 }
 
 func (i *index) Trigger(ctx context.Context, namespace, key string) error {
-	return i.ForEachListItem(ctx, namespace, key, i.cluster.EnqueueByObject)
+	return i.ForEachItem(ctx, namespace, key, i.cluster.EnqueueByObject)
 }
 
 func createListFromObject(scheme *runtime.Scheme, obj runtime.Object) (client.ObjectList, error) {

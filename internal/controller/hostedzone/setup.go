@@ -7,8 +7,8 @@ import (
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/kubedns/pkg/index"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/manageropts"
 	"github.com/mandelsoft/kubedns/pkg/objutils"
-	"github.com/mandelsoft/kubedns/pkg/options/manageropts"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -70,7 +70,7 @@ func Create(opts flagutils.OptionSetProvider) error {
 		r.Info("using separated runtime namespace", "namespace", r.Options.RuntimeNamespace)
 		r.Info("using Runtime mode")
 		r.Mode = NewRuntimeMode(r)
-		r.runtimeOwner = owner.RemoteOwner("coredns.mandelsoft.org/owner-id", r.Options.Class)
+		r.runtimeOwner = owner.RemoteOwner(r.Runtime.Scheme(), "coredns.mandelsoft.org/owner-id", r.Options.Class)
 	} else {
 		r.Info("using Local mode")
 		r.Mode = NewLocalMode(r)

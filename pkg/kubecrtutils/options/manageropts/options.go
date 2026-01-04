@@ -6,9 +6,9 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
-	"github.com/mandelsoft/kubedns/pkg/options/metricsopts"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/metricsopts"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/webhookopts"
 	"github.com/mandelsoft/kubedns/pkg/options/tlsopts"
-	"github.com/mandelsoft/kubedns/pkg/options/webhookopts"
 	"github.com/mandelsoft/logging"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -33,7 +33,6 @@ type Options struct {
 	// They are used to finalize the manager options before
 	// the manager is created.
 	Configurations []ConfigurationProvider
-	mgmt           ControllerManagerContext
 }
 
 func From(opts flagutils.OptionSetProvider) *Options {
@@ -43,7 +42,6 @@ func From(opts flagutils.OptionSetProvider) *Options {
 var (
 	_ flagutils.Options     = (*Options)(nil)
 	_ flagutils.Validatable = (*Options)(nil)
-	_ flagutils.OptionSet   = (*Options)(nil) // forward kubeconfig options as nested set
 )
 
 func New(main string, electionId string, configs ...ConfigurationProvider) *Options {
@@ -55,40 +53,72 @@ func New(main string, electionId string, configs ...ConfigurationProvider) *Opti
 	return &Options{Nested: nested, defaultElectionId: electionId, Configurations: configs, main: main}
 }
 
-func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
-	if o.mgmt.Manager != nil {
-		return nil
-	}
+func (o *Options) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&o.ElectionId, "leader-election-id", o.ElectionId, "Id for leader election")
+	fs.StringVar(&o.ProbeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	fs.StringVar(&o.LeaderElectionNamespace, "leader-elect-namespace", "", "leader election namespace")
+	fs.BoolVar(&o.EnableLeaderElection, "leader-elect", false,
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
+	o.Nested.AddFlags(fs)
+}
 
+func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	err := flagutils.Validate(ctx, o.Nested, v)
 	if err != nil {
 		return err
 	}
 
-	o.mgmt.Clusters, err = cluster.ValidatedClusters(ctx, opts, v)
+	clusters, err := cluster.ValidatedClusters(ctx, opts, v)
 	if err != nil {
 		return err
 	}
 
-	main := o.mgmt.Get(o.main)
+	main := clusters.Get(o.main)
 	if main == nil {
 		return fmt.Errorf("could not find main cluster %q", o.main)
 	}
 
-	metrics, err := flagutils.ValidatedOptions[*metricsopts.Options](ctx, opts, v)
+	_, err = flagutils.ValidatedOptions[*metricsopts.Options](ctx, opts, v)
 	if err != nil {
 		return err
 	}
 
-	web, err := flagutils.ValidatedOptions[*webhookopts.Options](ctx, opts, v)
+	_, err = flagutils.ValidatedOptions[*webhookopts.Options](ctx, opts, v)
 	if err != nil {
 		return err
 	}
 
-	configs, err := flagutils.ValidatedFilteredOptions[ConfigurationProvider](ctx, opts, v)
-	if err != nil {
-		return err
+	_, err = flagutils.ValidatedFilteredOptions[ConfigurationProvider](ctx, opts, v)
+	return err
+}
+
+// AsOptionSet provides access o the nested option set.
+func (o *Options) AsOptionSet() flagutils.OptionSet {
+	return o.Nested
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+func (o *Options) GetMain() string {
+	return o.main
+}
+
+func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvider) (ctrl.Manager, error) {
+	clusters := cluster.From(opts).GetClusters()
+	if clusters == nil {
+		return nil, fmt.Errorf("no cluster definitions found in options")
 	}
+
+	main := clusters.Get(o.main)
+	if main == nil {
+		return nil, fmt.Errorf("could not find main cluster %q", o.main)
+	}
+
+	metrics := metricsopts.From(opts)
+	web := webhookopts.From(opts)
+
+	configs := flagutils.Filter[ConfigurationProvider](opts)
 
 	cfg := ctrl.Options{
 		Logger:                  logging.DefaultContext().Logger(logging.NewRealm("controller-manager")).V(4),
@@ -122,9 +152,9 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 	}
 
 	for _, conf := range configs {
-		err := conf.Configure(ctx, &cfg, opts, v)
+		err := conf.Configure(ctx, &cfg, opts.AsOptionSet())
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -133,77 +163,30 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 	}
 
 	for _, conf := range o.Configurations {
-		err := conf.Configure(ctx, &cfg, opts, v)
+		err := conf.Configure(ctx, &cfg, opts.AsOptionSet())
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	o.mgmt.Manager, err = ctrl.NewManager(main.GetConfig(), cfg)
+	m, err := ctrl.NewManager(main.GetConfig(), cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	found := sets.New[*rest.Config]()
 
-	for c := range o.mgmt.Clusters.Clusters {
+	for _, c := range clusters.Elements {
 		rcfg := c.GetEffective().GetConfig()
 		if !found.Has(rcfg) {
 			found.Insert(rcfg)
 			cfg.Logger.Info("adding cluster {{cluster}} -> {{effective}}", "cluster", c.GetName(), "effective", c.GetEffective().GetName())
-			err = o.mgmt.Manager.Add(c.GetEffective())
+			err = m.Add(c.GetEffective())
 		} else {
 			cfg.Logger.Info("cluster {{cluster}} -> {{effective}} already added", "cluster", c.GetName(), "effective", c.GetEffective().GetName())
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
-}
-
-func (o *Options) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&o.ElectionId, "leader-election-id", o.ElectionId, "Id for leader election")
-	fs.StringVar(&o.ProbeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	fs.StringVar(&o.LeaderElectionNamespace, "leader-elect-namespace", "", "leader election namespace")
-	fs.BoolVar(&o.EnableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	o.Nested.AddFlags(fs)
-}
-
-// AsOptionSet provides access o the netsed option set.
-func (o *Options) AsOptionSet() flagutils.OptionSet {
-	return o.Nested
-}
-
-// Options is the iterator for nested options.
-func (o *Options) Options(yield func(flagutils.Options) bool) {
-	o.Nested.Options(yield)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func (o *Options) GetManager() ctrl.Manager {
-	return o.mgmt.Manager
-}
-
-func (o *Options) ControllerManagerContext() *ControllerManagerContext {
-	return &o.mgmt
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-type ControllerManagerContext struct {
-	ctrl.Manager
-	cluster.Clusters
-}
-
-func (m *ControllerManagerContext) NewController() *ctrl.Builder {
-	return ctrl.NewControllerManagedBy(m.Manager)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func GetManagementContext(opts flagutils.OptionSetProvider) *ControllerManagerContext {
-	return From(opts).ControllerManagerContext()
+	return m, nil
 }

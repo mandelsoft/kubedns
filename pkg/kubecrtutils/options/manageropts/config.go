@@ -13,5 +13,5 @@ import (
 // after the option parsing. Or this interface can be implemented by other
 // Options types to incorporate their settings into the configuration.
 type ConfigurationProvider interface {
-	Configure(ctx context.Context, config *ctrl.Options, opts flagutils.OptionSet, v flagutils.ValidationSet) error
+	Configure(ctx context.Context, config *ctrl.Options, opts flagutils.OptionSet) error
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
-	"github.com/mandelsoft/kubedns/pkg/options/manageropts"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/manageropts"
 	"github.com/spf13/pflag"
 	ctrl "sigs.k8s.io/controller-runtime"
 )

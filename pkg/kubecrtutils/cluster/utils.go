@@ -12,12 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 type OperationContext interface {
@@ -250,18 +248,6 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*M
 	return &desired, c.Patch(ctx, &current, rawPatch, &client.PatchOptions{
 		FieldManager: ctx.GetFieldManager(),
 	})
-}
-
-func GKVForObject(c SchemeProvider, obj client.Object) (schema.GroupVersionKind, error) {
-	return apiutil.GVKForObject(obj, c.GetScheme())
-}
-
-func GKForObject(c SchemeProvider, obj client.Object) (schema.GroupKind, error) {
-	gkv, err := apiutil.GVKForObject(obj, c.GetScheme())
-	if err != nil {
-		return schema.GroupKind{}, err
-	}
-	return schema.GroupKind{Group: gkv.Group, Kind: gkv.Kind}, nil
 }
 
 type modificationWrapper struct {

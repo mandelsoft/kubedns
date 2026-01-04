@@ -1,7 +1,7 @@
 package restconfig
 
 import (
-	"github.com/mandelsoft/kubedns/pkg/kubeconfig"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/kubeconfig"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -15,11 +15,11 @@ func NewHomeDirectory() Rule {
 	return HomeDirectory{}
 }
 
-func (h HomeDirectory) GetConfig() (*rest.Config, error) {
+func (h HomeDirectory) GetConfig(opts *RuleOptions) (*rest.Config, error) {
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	if err := rules.Migrate(); err != nil {
 		return nil, err
 	}
 
-	return kubeconfig.TryKubeconfigFile(clientcmd.RecommendedHomeFile)
+	return kubeconfig.TryKubeconfigFile(clientcmd.RecommendedHomeFile, &opts.ConfigOverrides)
 }

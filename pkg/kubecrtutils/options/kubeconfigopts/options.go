@@ -31,6 +31,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	o.rules.AddFlags(fs)
 }
 
-func (o *Options) GetConfig() (*rest.Config, error) {
-	return o.rules.GetConfig()
+func (o *Options) GetConfig(*restconfig.RuleOptions) (*rest.Config, error) {
+	return o.rules.GetConfig(nil)
 }

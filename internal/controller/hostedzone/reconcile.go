@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-test/deep"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	. "github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
 	clusterutils2 "github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
+	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/kubedns/pkg/render"
 	"github.com/mandelsoft/logging"

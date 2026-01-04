@@ -6,7 +6,7 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/general"
-	"github.com/mandelsoft/kubedns/pkg/kubeconfig"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/kubeconfig"
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/rest"
 )

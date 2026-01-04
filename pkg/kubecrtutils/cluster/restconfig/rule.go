@@ -7,14 +7,24 @@ import (
 	"github.com/mandelsoft/goutils/general"
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
+type RuleOptions struct {
+	clientcmd.ConfigOverrides
+}
+
+type Personalization struct {
+	Name        string
+	Description string
+}
+
 type Personalizable interface {
-	PersonalizedWith(name string) Rule
+	PersonalizedWith(name *Personalization) Rule
 }
 
 type Rule interface {
-	GetConfig() (*rest.Config, error)
+	GetConfig(opts *RuleOptions) (*rest.Config, error)
 }
 
 type Rules interface {
@@ -22,23 +32,32 @@ type Rules interface {
 	flagutils.OptionSetProvider
 
 	Add(r ...Rule) Rules
-	GetConfig() (*rest.Config, error)
-	PersonalizedWith(name string) Rules
+	GetConfig(*RuleOptions) (*rest.Config, error)
+	PersonalizedWith(o *Personalization) Rules
 	Rules(yield func(r Rule) bool)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 type rules struct {
-	options flagutils.DefaultOptionSet
-	rules   []Rule
-	orig    *rules
+	options  flagutils.DefaultOptionSet
+	ruleopts *RuleOptions
+	rules    []Rule
+	orig     *rules
 }
 
 var _ Rule = Rules(nil)
 
 func NewRules(r ...Rule) Rules {
-	return &rules{rules: slices.Clone(r)}
+	return &rules{rules: slices.Clone(r), ruleopts: &RuleOptions{}}
+}
+
+func (r *rules) WithOptions(o *RuleOptions) Rules {
+	if o == nil {
+		o = &RuleOptions{}
+	}
+	r.ruleopts = o
+	return r
 }
 
 func (r *rules) Add(e ...Rule) Rules {
@@ -47,9 +66,9 @@ func (r *rules) Add(e ...Rule) Rules {
 	return r
 }
 
-func (r *rules) GetConfig() (*rest.Config, error) {
+func (r *rules) GetConfig(*RuleOptions) (*rest.Config, error) {
 	for _, rule := range r.rules {
-		cfg, err := rule.GetConfig()
+		cfg, err := rule.GetConfig(r.ruleopts)
 		if err != nil || cfg != nil {
 			return cfg, err
 		}
@@ -65,12 +84,12 @@ func (r *rules) Rules(yield func(r Rule) bool) {
 	}
 }
 
-func (r *rules) PersonalizedWith(name string) Rules {
+func (r *rules) PersonalizedWith(o *Personalization) Rules {
 	n := &rules{
 		orig: r.orig,
 	}
 	for _, e := range general.Optional(r.orig, r).rules {
-		n.Add(PersonalizeRule(e, name))
+		n.Add(PersonalizeRule(e, o))
 	}
 	return n
 }
@@ -91,12 +110,12 @@ func (r *rules) AddFlags(fs *pflag.FlagSet) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func PersonalizeRule(r Rule, name string) Rule {
-	if name == "" {
+func PersonalizeRule(r Rule, o *Personalization) Rule {
+	if o.Name == "" {
 		return r
 	}
 	if p, ok := r.(Personalizable); ok {
-		return p.PersonalizedWith(name)
+		return p.PersonalizedWith(o)
 	} else {
 		return r
 	}
@@ -104,6 +123,7 @@ func PersonalizeRule(r Rule, name string) Rule {
 
 func DefaultRules() Rules {
 	return NewRules(
+		NewContextOption(""),
 		NewKubeconfigOption("", "").WithInClusterMode(),
 		NewEnvironmentVariable(),
 		NewHomeDirectory(),
@@ -113,6 +133,10 @@ func DefaultRules() Rules {
 
 func DedicatedConfigRules(name, desc string) Rules {
 	return NewRules(
-		NewKubeconfigOption("", "").WithInClusterMode().PersonalizedWith(name + "@" + desc),
-	)
+		NewContextOption(""),
+		NewKubeconfigOption("", "").WithInClusterMode(),
+	).PersonalizedWith(&Personalization{
+		Name:        name,
+		Description: desc,
+	})
 }

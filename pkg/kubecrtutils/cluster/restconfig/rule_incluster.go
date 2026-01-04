@@ -12,7 +12,7 @@ func NewInClusterConfig() Rule {
 	return InClusterConfig{}
 }
 
-func (r InClusterConfig) GetConfig() (*rest.Config, error) {
+func (r InClusterConfig) GetConfig(*RuleOptions) (*rest.Config, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
 		if err == os.ErrNotExist || err == rest.ErrNotInCluster {

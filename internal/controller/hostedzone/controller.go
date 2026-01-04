@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/mandelsoft/kubedns/internal/controller/common"
-	. "github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
 	"github.com/mandelsoft/kubedns/pkg/index"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
+	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubedns/pkg/owner"
 	"github.com/mandelsoft/logging"
 	corev1 "k8s.io/api/core/v1"

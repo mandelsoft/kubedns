@@ -11,7 +11,7 @@ import (
 
 func main() {
 
-	mgmtDef := ctrlmgmt.NewDefinition().
+	mgmtDef := ctrlmgmt.NewDefinition("coredns.mandelsoft.org", "dataplane").
 		AddCluster(
 			cluster.NewDefinition("dataplane", "user interface").WithFallback(cluster.DEFAULT),
 			cluster.NewDefinition("runtime", "runtime cluster").WithFallback("dataplane"),

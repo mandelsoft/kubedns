@@ -5,22 +5,25 @@ import (
 	"strings"
 
 	"github.com/mandelsoft/kubedns/pkg/objutils"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 const DEFAULT_REMOTE_NAME = "cross-cluster.io/owner-id"
 
 type remote struct {
-	name  string
-	class string
+	scheme *runtime.Scheme
+	name   string
+	class  string
 }
 
-func RemoteOwner(name string, class string) OwnerHandler {
+func RemoteOwner(scheme *runtime.Scheme, name string, class string) OwnerHandler {
 	if name == "" {
 		name = DEFAULT_REMOTE_NAME
 	}
-	return &remote{class: class, name: name}
+	return &remote{scheme: scheme, class: class, name: name}
 }
 
 func (l *remote) GetOwner(obj client.Object, kind schema.GroupKind) *client.ObjectKey {
@@ -53,7 +56,11 @@ func (l *remote) match(fields []string, kind schema.GroupKind) bool {
 }
 
 func (l *remote) SetOwner(owner client.Object, obj client.Object) error {
-	gvk := owner.GetObjectKind().GroupVersionKind()
+	gvk, err := apiutil.GVKForObject(owner, l.scheme)
+
+	if err != nil {
+		return err
+	}
 	if gvk.Group == "" {
 		gvk.Group = "core"
 	}

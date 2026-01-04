@@ -3,14 +3,19 @@ package index
 import (
 	"context"
 
+	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/internal"
 )
 
+func From(opts flagutils.OptionSetProvider) Definitions {
+	return flagutils.GetFrom[Definitions](opts)
+}
+
 type Definitions interface {
 	internal.Definitions[Definition, Definitions]
 
-	Apply(ctx context.Context, clusters cluster.Clusters) error
+	GetIndices(ctx context.Context, clusters cluster.Clusters) (Indices, error)
 }
 
 type _definitions struct {
@@ -23,12 +28,13 @@ func NewDefinitions() Definitions {
 	return d
 }
 
-func (d *_definitions) Apply(ctx context.Context, clusters cluster.Clusters) error {
+func (d *_definitions) GetIndices(ctx context.Context, clusters cluster.Clusters) (Indices, error) {
+	indices := NewIndices()
 	for _, i := range d.Elements {
 		_, err := i.Apply(ctx, clusters)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return indices, nil
 }

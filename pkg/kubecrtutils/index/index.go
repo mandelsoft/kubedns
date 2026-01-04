@@ -11,17 +11,16 @@ import (
 type Index[T any] interface {
 	cluster.Index
 
-	Get(namespace string, name string) ([]T, error)
-	ForEachItem(ctx context.Context, namespace, key string, action func(object *T) error) error
+	GetTyped(namespace string, name string) ([]T, error)
+	ForEachTypedItem(ctx context.Context, namespace, key string, action func(object *T) error) error
 }
 
 type _index[T any] struct {
 	cluster.Index
-	name    string
 	cluster cluster.Cluster
 }
 
-func (i *_index[T]) Get(ctx context.Context, namespace string, name string) ([]T, error) {
+func (i *_index[T]) GetTyped(ctx context.Context, namespace string, name string) ([]T, error) {
 	list, err := i.GetList(ctx, namespace, name)
 	if err != nil {
 		return nil, err
@@ -29,8 +28,8 @@ func (i *_index[T]) Get(ctx context.Context, namespace string, name string) ([]T
 	return GetItemList[T](list)
 }
 
-func (i *_index[T]) ForEachItem(ctx context.Context, namespace, key string, action func(object *T) error) error {
-	list, err := i.Get(ctx, namespace, key)
+func (i *_index[T]) ForEachTypedItem(ctx context.Context, namespace, key string, action func(object *T) error) error {
+	list, err := i.GetTyped(ctx, namespace, key)
 	if err != nil {
 		return err
 	}
