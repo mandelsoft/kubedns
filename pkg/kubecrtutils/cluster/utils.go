@@ -6,7 +6,7 @@ import (
 
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/goutils/generics"
-	"github.com/mandelsoft/kubedns/pkg/merge"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/merge"
 	"github.com/mandelsoft/kubedns/pkg/objutils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

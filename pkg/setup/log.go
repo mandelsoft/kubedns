@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-var Log logr.Logger
+var Log logging.Logger
 
 // because there are many (partially private Logger variables
 // used by kubebuilder and controller runtime initialized
@@ -22,9 +22,12 @@ func init() {
 
 	logging.DefaultContext().SetBaseLogger(base)
 
-	ctrl.SetLogger(LoggerWithShiftedSinkLevel(base, 3))
+	Log = logging.DefaultContext().Logger(logging.NewRealm("controller-runtime"))
+
+	ctrl.SetLogger(LoggerWithShiftedSinkLevel(Log.V(0), 3))
 	log.Log = ctrl.Log
-	Log = ctrl.Log.WithName("setup")
+
+	ctrl.Log.V(3).Info("logging initialized")
 }
 
 type delegatingSink struct {

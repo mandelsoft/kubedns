@@ -50,7 +50,7 @@ type definition struct {
 
 var _ Definition = (*definition)(nil)
 
-func NewDefinition(name string, desc string, rule ...restconfig.Rule) Definition {
+func Define(name string, desc string, rule ...restconfig.Rule) Definition {
 	if len(rule) == 0 {
 		rule = []restconfig.Rule{restconfig.DedicatedConfigRules(name, desc)}
 	}

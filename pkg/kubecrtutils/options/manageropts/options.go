@@ -7,8 +7,8 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/metricsopts"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/tlsopts"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/webhookopts"
-	"github.com/mandelsoft/kubedns/pkg/options/tlsopts"
 	"github.com/mandelsoft/logging"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -16,6 +16,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 )
 
 type Options struct {
@@ -171,6 +172,13 @@ func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvid
 	m, err := ctrl.NewManager(main.GetConfig(), cfg)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := m.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		return nil, fmt.Errorf("unable to set up health check: %w", err)
+	}
+	if err := m.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		return nil, fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
 	found := sets.New[*rest.Config]()

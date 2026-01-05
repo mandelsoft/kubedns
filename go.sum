@@ -128,8 +128,8 @@ github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0
 github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
 github.com/mandelsoft/filepath v0.0.0-20240223090642-3e2777258aa3 h1:oo9nIgnyiBgYPbcZslRT4y29siuL5EoNJ/t1tr0xEVQ=
 github.com/mandelsoft/filepath v0.0.0-20240223090642-3e2777258aa3/go.mod h1:LxhqC7khDoRENwooP6f/vWvia9ivj6TqLYrR39zqkN0=
-github.com/mandelsoft/flagutils v0.0.0-20260102151554-dee4ad9646e3 h1:uYAEDixVwZO6fLcNnGPmEpgqSMTD2cTjh+Kp9QFzxZg=
-github.com/mandelsoft/flagutils v0.0.0-20260102151554-dee4ad9646e3/go.mod h1:q6tapbMOcHtQS0JLecIdvI0KxRUQfMqjE9OUi/V1oT8=
+github.com/mandelsoft/flagutils v0.0.0-20260105014053-ff948a418990 h1:UA9FHxFAyhwxtJfHh9WgkTEyAWseiX9l2WCc3CAlouM=
+github.com/mandelsoft/flagutils v0.0.0-20260105014053-ff948a418990/go.mod h1:q6tapbMOcHtQS0JLecIdvI0KxRUQfMqjE9OUi/V1oT8=
 github.com/mandelsoft/goutils v0.0.0-20251108170156-7404c5a2417e h1:2UFwqNZcancrR0kj9/k6tR6zspQOLl1x7H5MWJ5KWjg=
 github.com/mandelsoft/goutils v0.0.0-20251108170156-7404c5a2417e/go.mod h1:fTCyGFCMm+ugUn1FqcHeWelCjoSYtkJaqnJvSmgkx1M=
 github.com/mandelsoft/logging v0.0.0-20240618075559-fdca28a87b0a h1:MAvh0gbP2uwKmf7wWCkYCzrYa6vPjBvYeGhoUlVHwtI=

@@ -1,4 +1,4 @@
-package index
+package cacheindex
 
 import (
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/types"

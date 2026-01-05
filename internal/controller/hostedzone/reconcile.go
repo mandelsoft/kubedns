@@ -11,7 +11,7 @@ import (
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	clusterutils2 "github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
-	"github.com/mandelsoft/kubedns/pkg/owner"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/owner"
 	"github.com/mandelsoft/kubedns/pkg/render"
 	"github.com/mandelsoft/logging"
 	appsv1 "k8s.io/api/apps/v1"

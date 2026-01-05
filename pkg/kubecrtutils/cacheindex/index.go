@@ -1,4 +1,4 @@
-package index
+package cacheindex
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 type Index[T any] interface {
 	cluster.Index
 
-	GetTyped(namespace string, name string) ([]T, error)
+	GetTyped(ctx context.Context, ns string, name string) ([]T, error)
 	ForEachTypedItem(ctx context.Context, namespace, key string, action func(object *T) error) error
 }
 
@@ -19,6 +19,8 @@ type _index[T any] struct {
 	cluster.Index
 	cluster cluster.Cluster
 }
+
+var _ Index[any] = (*_index[any])(nil)
 
 func (i *_index[T]) GetTyped(ctx context.Context, namespace string, name string) ([]T, error) {
 	list, err := i.GetList(ctx, namespace, name)

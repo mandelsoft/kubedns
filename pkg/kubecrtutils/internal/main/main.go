@@ -11,10 +11,10 @@ import (
 
 func main() {
 
-	mgmtDef := ctrlmgmt.NewDefinition("coredns.mandelsoft.org", "dataplane").
+	mgmtDef := ctrlmgmt.Define("coredns.mandelsoft.org", "dataplane").
 		AddCluster(
-			cluster.NewDefinition("dataplane", "user interface").WithFallback(cluster.DEFAULT),
-			cluster.NewDefinition("runtime", "runtime cluster").WithFallback("dataplane"),
+			cluster.Define("dataplane", "user interface").WithFallback(cluster.DEFAULT),
+			cluster.Define("runtime", "runtime cluster").WithFallback("dataplane"),
 		)
 
 	opts := &flagutils.DefaultOptionSet{}

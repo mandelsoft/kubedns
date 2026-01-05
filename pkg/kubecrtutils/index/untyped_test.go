@@ -1,7 +1,7 @@
 package index_test
 
 import (
-	"github.com/mandelsoft/kubedns/pkg/index"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/index"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/sets"

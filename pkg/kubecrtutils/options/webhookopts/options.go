@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/kubedns/pkg/options/tlsopts"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/tlsopts"
 	"github.com/mandelsoft/kubedns/pkg/setup"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"

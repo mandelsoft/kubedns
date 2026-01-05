@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/internal"
@@ -30,14 +31,24 @@ func NewDefinitions() Definitions {
 
 func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (Controllers, error) {
 	controllers := NewControllers()
-	for _, i := range d.Elements {
-		c, err := i.Apply(ctx, mgr)
+	mgr.GetLogger().Info("configure controllers...")
+	// Step 1: create controllers and their environment like indices
+	for n, i := range d.Elements {
+		c, err := i.CreateController(ctx, mgr)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("controller %q: %w", n, err)
 		}
 		err = controllers.Add(c)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("controller %q: %w", n, err)
+		}
+	}
+	// Step 2: complete the controller by creating their reconciler
+	// (by factory) and finally configure the controller runtime manager.
+	for n, i := range controllers.Elements {
+		err := i.Complete(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("controller %q: %w", n, err)
 		}
 	}
 	return controllers, nil

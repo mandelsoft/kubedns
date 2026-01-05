@@ -1,4 +1,4 @@
-package owner_test
+package cacheindex_test
 
 import (
 	"testing"
@@ -9,5 +9,5 @@ import (
 
 func TestConfig(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "OwnerTest Suite")
+	RunSpecs(t, "Cache Index Test Suite")
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/enqueue"
-	"github.com/mandelsoft/kubedns/pkg/merge"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/merge"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"

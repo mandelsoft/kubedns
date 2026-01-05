@@ -6,7 +6,9 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/manageropts"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/ctrlmgmt"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/metricsopts"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/mlogopts"
 	"github.com/mandelsoft/kubedns/pkg/setup"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -16,8 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/entry"
@@ -37,50 +37,27 @@ func init() {
 // nolint:gocyclo
 func main() {
 
+	setup.ExitIfErr(hostedzone.TestRenderManifests(), "problems with included manifests")
+
+	def := ctrlmgmt.Define("coredns.mandelsoft.org", "dataplane").
+		WithScheme(scheme).
+		AddCluster(
+			cluster.Define("runtime", "runtime cluster").WithFallback(cluster.DEFAULT),
+			cluster.Define("dataplane", "user api cluster").WithFallback("runtime"),
+		).
+		AddController(
+			hostedzone.Controller(),
+			entry.Controller(),
+		)
+
 	options := flagutils.DefaultOptionSet{}
 
 	options.Add(
-		cluster.NewDefinitions().WithScheme(scheme).
-			Add(cluster.NewDefinition("dataplane", "user facing configuration dataplane")).
-			Add(cluster.NewDefinition("runtime", "runtime cluster").WithFallback("dataplane")),
-
-		// zapopts.New(&zap.Options{
-		//	Development: true,
-		// }),
-		manageropts.New("dataplane", "coredns.mandelsoft.org"),
-		// metrics.New(),
-		// webhookopts.New(),
-		hostedzone.NewOptions(),
+		metricsopts.New(),  // options to control the manager metrics service
+		mlogopts.New(true), // options to control mandelsoft/logging
+		// other options
 	)
 
-	setup.Log.Info("condiguring options...")
-	setup.Setup(options, os.Args[1:]...)
-
-	setup.ExitIfErr(hostedzone.TestRenderManifests(), "problems with included mainfests")
-
-	if err := hostedzone.Create(options); err != nil {
-		setup.Log.Error(err, "unable to create controller", "controller", "HostedZone")
-		os.Exit(1)
-	}
-	if err := entry.Create(options); err != nil {
-		setup.Log.Error(err, "unable to create controller", "controller", "CoreDNSEntry")
-		os.Exit(1)
-	}
-	// +kubebuilder:scaffold:builder
-
-	mgr := manageropts.From(options).GetManager()
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setup.Log.Error(err, "unable to set up health check")
-		os.Exit(1)
-	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setup.Log.Error(err, "unable to set up ready check")
-		os.Exit(1)
-	}
-
-	setup.Log.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setup.Log.Error(err, "problem running manager")
-		os.Exit(1)
-	}
+	err := ctrlmgmt.Setup(options, def, os.Args[1:]...)
+	setup.ExitIfErr(err, "setup controller manager")
 }

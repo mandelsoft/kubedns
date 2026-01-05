@@ -4,13 +4,14 @@ import (
 	"errors"
 
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/index"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/internal"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/manageropts"
 	"github.com/spf13/pflag"
 	"golang.org/x/net/context"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func From(opts flagutils.OptionSetProvider) Definition {
@@ -21,11 +22,15 @@ type Definition interface {
 	internal.Named
 	flagutils.Options
 	flagutils.OptionSetProvider
+	WithScheme(scheme *runtime.Scheme) Definition
 	AddCluster(def ...cluster.Definition) Definition
 	AddController(def ...controller.Definition) Definition
-	AddIndex(def ...index.Definition) Definition
+	AddIndex(def ...cacheindex.Definition) Definition
+
+	GetController(name string) controller.Definition
 
 	GetError() error
+	GetControllerManager(ctx context.Context, opts flagutils.OptionSetProvider) (ControllerManager, error)
 }
 
 type definition struct {
@@ -33,17 +38,22 @@ type definition struct {
 	options     flagutils.DefaultOptionSet
 	clusters    cluster.Definitions
 	controllers controller.Definitions
-	indices     index.Definitions
+	indices     cacheindex.Definitions
 }
 
-func NewDefinition(name, main string) Definition {
+func Define(name, main string) Definition {
 	d := &definition{
 		Element:     internal.NewElement(name),
 		clusters:    cluster.NewDefinitions(),
-		indices:     index.NewDefinitions(),
+		indices:     cacheindex.NewDefinitions(),
 		controllers: controller.NewDefinitions(),
 	}
-	d.options.Add(d.clusters, d.indices, manageropts.New(main, name))
+	d.options.Add(d.clusters, d.indices, d.controllers, manageropts.New(main, name))
+	return d
+}
+
+func (d *definition) WithScheme(scheme *runtime.Scheme) Definition {
+	d.clusters.WithScheme(scheme)
 	return d
 }
 
@@ -57,7 +67,7 @@ func (d *definition) AddController(def ...controller.Definition) Definition {
 	return d
 }
 
-func (d *definition) AddIndex(def ...index.Definition) Definition {
+func (d *definition) AddIndex(def ...cacheindex.Definition) Definition {
 	d.indices.Add(def...)
 	return d
 }
@@ -70,6 +80,10 @@ func (d *definition) AddFlags(fs *pflag.FlagSet) {
 
 func (d *definition) AsOptionSet() flagutils.OptionSet {
 	return d.options
+}
+
+func (d *definition) GetController(name string) controller.Definition {
+	return d.controllers.Get(name)
 }
 
 func (d *definition) GetError() error {

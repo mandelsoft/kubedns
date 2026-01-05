@@ -23,10 +23,10 @@ import (
 	"time"
 
 	"github.com/mandelsoft/kubedns/internal/controller/common"
-	"github.com/mandelsoft/kubedns/pkg/index"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
-	"github.com/mandelsoft/kubedns/pkg/owner"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/index"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/owner"
 	"github.com/mandelsoft/logging"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -66,6 +66,10 @@ type HostedZoneReconciler struct {
 	recorder     record.EventRecorder
 
 	index index.UntypedIndex
+}
+
+func (r *HostedZoneReconciler) IsSeparateRuntime() bool {
+	return r.Options.RuntimeNamespace != "" || !r.DataPlane.IsSameAs(r.Runtime)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -126,21 +130,29 @@ func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return Result(logger, prob, after)
 }
 
-func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger logging.Logger, obj client.ObjectKey) {
+func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger logging.Logger, obj client.ObjectKey) error {
 	logger.Info("notify children about changes")
-	children := r.GetNestedZones(ctx, obj.Namespace, obj.Name)
+	children, err := r.GetNestedZones(ctx, obj.Namespace, obj.Name)
+	if err != nil {
+		return err
+	}
 	for _, c := range children {
 		logger.Info("triggering child", "name", c.Name, "namespace", c.Namespace)
 		r.DataPlane.EnqueueByObject(&c)
 	}
+	return nil
 }
 
-func (r *HostedZoneReconciler) TriggerEntries(ctx context.Context, logger logging.Logger, obj client.ObjectKey) {
-	entries := r.GetEntriesForZone(ctx, obj.Namespace, obj.Name)
+func (r *HostedZoneReconciler) TriggerEntries(ctx context.Context, logger logging.Logger, obj client.ObjectKey) error {
+	entries, err := r.GetEntriesForZone(ctx, obj.Namespace, obj.Name)
+	if err != nil {
+		return err
+	}
 	logger.Info("notify {{amount}} children about changes", "amount", len(entries))
 	for _, c := range entries {
 		r.DataPlane.EnqueueByObject(&c)
 	}
+	return nil
 }
 
 func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.Logger, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, Problem) {

@@ -6,8 +6,9 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/go-test/deep v1.1.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/google/cel-go v0.26.0
 	github.com/lestrrat-go/jwx/v2 v2.1.6
-	github.com/mandelsoft/flagutils v0.0.0-20260102151554-dee4ad9646e3
+	github.com/mandelsoft/flagutils v0.0.0-20260105014053-ff948a418990
 	github.com/mandelsoft/goutils v0.0.0-20251108170156-7404c5a2417e
 	github.com/mandelsoft/logging v0.0.0-20240618075559-fdca28a87b0a
 	github.com/mandelsoft/spiff v1.3.0-beta-7.0.20251217160149-636218617943
@@ -49,7 +50,6 @@ require (
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/btree v1.1.3 // indirect
-	github.com/google/cel-go v0.26.0 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20251007162407-5df77e3f7d1d // indirect

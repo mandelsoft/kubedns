@@ -70,7 +70,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&o.Platform, "iaas", "", "default", "IaaS layer to use (special support so far for \"aws\"")
 }
 
-func (o *Options) Configure(ctx context.Context, cfg *ctrl.Options, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
+func (o *Options) Configure(ctx context.Context, cfg *ctrl.Options, opts flagutils.OptionSet) error {
 	if o.Runtime != "" {
 		cfg.LeaderElectionID = o.Runtime + "-" + cfg.LeaderElectionID
 	}

@@ -1,4 +1,4 @@
-package index
+package cacheindex
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/internal"
+	"github.com/mandelsoft/logging"
 )
 
 func From(opts flagutils.OptionSetProvider) Definitions {
@@ -15,7 +16,7 @@ func From(opts flagutils.OptionSetProvider) Definitions {
 type Definitions interface {
 	internal.Definitions[Definition, Definitions]
 
-	GetIndices(ctx context.Context, clusters cluster.Clusters) (Indices, error)
+	GetIndices(ctx context.Context, clusters cluster.Clusters, logger logging.Logger) (Indices, error)
 }
 
 type _definitions struct {
@@ -28,10 +29,10 @@ func NewDefinitions() Definitions {
 	return d
 }
 
-func (d *_definitions) GetIndices(ctx context.Context, clusters cluster.Clusters) (Indices, error) {
+func (d *_definitions) GetIndices(ctx context.Context, clusters cluster.Clusters, logger logging.Logger) (Indices, error) {
 	indices := NewIndices()
 	for _, i := range d.Elements {
-		_, err := i.Apply(ctx, clusters)
+		_, err := i.Apply(ctx, clusters, logger)
 		if err != nil {
 			return nil, err
 		}

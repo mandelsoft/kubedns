@@ -6,9 +6,9 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/index"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/internal"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/manageropts"
 	"github.com/mandelsoft/logging"
@@ -39,26 +39,30 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 
 	manager, err := mopts.GetManager(ctx, opts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("settingup manager: %w", err)
 	}
 
-	var indices index.Indices
-	iopts := index.From(opts)
+	logger := kubecrtutils.LogContext.WithContext(logging.NewRealm(kubecrtutils.Realm.Name() + "/" + def.GetName())).Logger()
+
+	logger.Info("configure controller manager {{cm}}", "cm", def.GetName())
+	var indices cacheindex.Indices
+	iopts := cacheindex.From(opts)
 	if iopts != nil {
-		indices, err = iopts.GetIndices(ctx, clusters)
+		indices, err = iopts.GetIndices(ctx, clusters, logger)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("settingup indices: %w", err)
 		}
 	} else {
-		indices = index.NewIndices()
+		indices = cacheindex.NewIndices()
 	}
 	cm := &_controllermanager{
-		Element:  internal.NewElement(def.GetName()),
-		logger:   kubecrtutils.LogContext.WithContext(logging.NewRealm(kubecrtutils.Realm.Name() + "/" + def.GetName())).Logger(),
-		clusters: clusters,
-		manager:  manager,
-		main:     clusters.Get(mopts.GetMain()),
-		indices:  indices,
+		Element:    internal.NewElement(def.GetName()),
+		logger:     logger,
+		clusters:   clusters,
+		manager:    manager,
+		main:       clusters.Get(mopts.GetMain()),
+		indices:    indices,
+		definition: def,
 	}
 
 	cntropts := controller.From(opts)
@@ -67,7 +71,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 	}
 	cntr, err := cntropts.Apply(ctx, cm)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("settingup controllers: %w", err)
 	}
 	cm.controllers = cntr
 	return cm, nil
@@ -79,19 +83,24 @@ type _controllermanager struct {
 	main        cluster.Cluster
 	manager     ctrl.Manager
 	clusters    cluster.Clusters
-	indices     index.Indices
+	indices     cacheindex.Indices
 	controllers controller.Controllers
+	definition  Definition
 }
 
 func (cm *_controllermanager) GetLogger() logging.Logger {
 	return cm.logger
 }
 
+func (cm *_controllermanager) GetControllerDefinition(name string) controller.Definition {
+	return cm.definition.GetController(name)
+}
+
 func (cm *_controllermanager) GetClusters() cluster.Clusters {
 	return cm.clusters
 }
 
-func (cm *_controllermanager) GetIndices() index.Indices {
+func (cm *_controllermanager) GetIndices() cacheindex.Indices {
 	return cm.indices
 }
 
@@ -99,7 +108,7 @@ func (cm *_controllermanager) GetManager() ctrl.Manager {
 	return cm.manager
 }
 
-func (cm *_controllermanager) GetMainCLuster() cluster.Cluster {
+func (cm *_controllermanager) GetMainCluster() cluster.Cluster {
 	return cm.main
 }
 
