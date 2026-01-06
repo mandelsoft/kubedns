@@ -47,7 +47,7 @@ type CoreDNSEntryReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.4/pkg/reconcile
 func (r *CoreDNSEntryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := Log.WithName(req.String()).WithValues("object", req.NamespacedName)
+	log := r.WithName(req.String()).WithValues("object", req.NamespacedName)
 
 	log.Info("Reconciling CoreDNSEntry")
 	var obj corednsv1alpha1.CoreDNSEntry

@@ -1,4 +1,4 @@
-package restconfig
+package config
 
 import (
 	"strings"
@@ -6,9 +6,7 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/goutils/maputils"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/kubeconfig"
 	"github.com/spf13/pflag"
-	"k8s.io/client-go/rest"
 )
 
 type KubeConfigOption struct {
@@ -70,8 +68,9 @@ func (r *KubeConfigOption) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&r.path, r.name, "", "", r.desc)
 }
 
-func (r *KubeConfigOption) GetConfig(opts *RuleOptions) (*rest.Config, error) {
-	var cfg *rest.Config
+func (r *KubeConfigOption) GetConfig(opts *ConfigOptions) (*Config, error) {
+	var cfg *Config
+
 	if r.path != "" {
 		path := r.path
 		context := opts.CurrentContext
@@ -87,7 +86,7 @@ func (r *KubeConfigOption) GetConfig(opts *RuleOptions) (*rest.Config, error) {
 		if context != "" {
 			opts.CurrentContext = context
 		}
-		cfg, r.err = kubeconfig.TryKubeconfigFile(path, &opts.ConfigOverrides)
+		cfg, r.err = TryKubeconfigFile(path, opts)
 	}
 	return cfg, r.err
 }

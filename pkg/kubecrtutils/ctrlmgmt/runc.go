@@ -34,6 +34,9 @@ func Setup(opts flagutils.OptionSet, def Definition, args ...string) error {
 		return err
 	}
 	mgr, err := def.GetControllerManager(context.Background(), opts)
+	if err != nil {
+		return err
+	}
 	mgr.GetLogger().Info("starting manager")
 	return mgr.GetManager().Start(ctrl.SetupSignalHandler())
 }

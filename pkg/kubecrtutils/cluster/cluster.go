@@ -6,10 +6,10 @@ import (
 	"sync"
 
 	"github.com/mandelsoft/goutils/general"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster/config"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/enqueue"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/merge"
 	"k8s.io/apimachinery/pkg/util/managedfields"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,6 +22,7 @@ type _cluster struct {
 	client.Client
 	enqueue.Mux
 	name      string
+	id        string
 	converter managedfields.TypeConverter
 	start     sync.Once
 	indices   map[string]Index
@@ -45,7 +46,11 @@ func (c *_alias) GetName() string {
 	return c.name
 }
 
-func NewClusterForCRTCluster(name string, c cluster.Cluster) Cluster {
+func (c *_alias) Unwrap() Cluster {
+	return c.Cluster
+}
+
+func NewClusterForCRTCluster(name string, c cluster.Cluster, id ...string) Cluster {
 	conv, err := merge.NewConverterV3(c.GetConfig())
 	if err != nil {
 		return nil
@@ -54,18 +59,23 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster) Cluster {
 		Cluster:   c,
 		Client:    c.GetClient(),
 		name:      name,
+		id:        general.OptionalNonZeroDefaulted(name, id...),
 		converter: conv,
 		Mux:       enqueue.NewMux(c.GetScheme()),
 		indices:   map[string]Index{},
 	}
 }
 
-func NewCluster(name string, config *rest.Config, opts ...cluster.Option) (Cluster, error) {
-	c, err := cluster.New(config, opts...)
+func NewCluster(name string, config *config.Config, opts ...cluster.Option) (Cluster, error) {
+	c, err := cluster.New(config.RestConfig, opts...)
 	if err != nil {
 		return nil, err
 	}
-	conv, err := merge.NewConverterV3(config)
+	id := config.GetId()
+	if id == "" {
+		id = name
+	}
+	conv, err := merge.NewConverterV3(config.RestConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +83,7 @@ func NewCluster(name string, config *rest.Config, opts ...cluster.Option) (Clust
 		Cluster:   c,
 		Client:    c.GetClient(),
 		name:      name,
+		id:        id,
 		converter: conv,
 		indices:   map[string]Index{},
 		Mux:       enqueue.NewMux(c.GetScheme()),
@@ -81,6 +92,14 @@ func NewCluster(name string, config *rest.Config, opts ...cluster.Option) (Clust
 
 func (c *_cluster) GetName() string {
 	return c.name
+}
+
+func (c *_cluster) Unwrap() Cluster {
+	return nil
+}
+
+func (c *_cluster) GetId() string {
+	return c.id
 }
 
 func (c *_cluster) IsSameAs(o Cluster) bool {

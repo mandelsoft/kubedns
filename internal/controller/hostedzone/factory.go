@@ -7,9 +7,9 @@ import (
 	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/index"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/owner"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/types"
-	"github.com/mandelsoft/kubedns/pkg/objutils"
 	"github.com/mandelsoft/logging"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -101,6 +101,13 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 	}
 	r.Finalizer = r.FieldManager
 
+	r.Info("using dataplane cluster", "apiserver", r.DataPlane.GetConfig().Host)
+	if !r.Runtime.IsSameAs(r.DataPlane) {
+		r.Info("using separated runtime cluster", "apiserver", r.Runtime.GetConfig().Host)
+	} else {
+		r.Info("using same cluster as runtime")
+	}
+
 	r.Info("for Class '{{class}}'", "class", r.Options.Class)
 	r.Info("for Runtime '{{runtime}}'", "runtime", r.Options.Runtime)
 	r.Info("for Platform mode '{{platform}}'", "platform", r.Options.Platform)
@@ -131,13 +138,6 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 	} else {
 		r.Info("using Local mode")
 		r.Mode = NewLocalMode(r)
-	}
-
-	r.Info("using dataplane cluster", "apiserver", r.DataPlane.GetConfig().Host)
-	if !r.Runtime.IsSameAs(r.DataPlane) {
-		r.Info("using separated runtime cluster", "apiserver", r.Runtime.GetConfig().Host)
-	} else {
-		r.Info("using same cluster as runtime")
 	}
 
 	if r.IsSeparateRuntime() {

@@ -82,7 +82,7 @@ func (r *HostedZoneReconciler) IsSeparateRuntime() bool {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.4/pkg/reconcile
 func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := Log.WithName(req.String()).WithValues("object", req.NamespacedName)
+	logger := r.WithName(req.String()).WithValues("object", req.NamespacedName)
 
 	var after time.Duration
 

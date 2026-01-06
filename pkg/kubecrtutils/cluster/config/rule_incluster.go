@@ -1,4 +1,4 @@
-package restconfig
+package config
 
 import (
 	"os"
@@ -12,7 +12,7 @@ func NewInClusterConfig() Rule {
 	return InClusterConfig{}
 }
 
-func (r InClusterConfig) GetConfig(*RuleOptions) (*rest.Config, error) {
+func (r InClusterConfig) GetConfig(opts *ConfigOptions) (*Config, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
 		if err == os.ErrNotExist || err == rest.ErrNotInCluster {
@@ -20,5 +20,5 @@ func (r InClusterConfig) GetConfig(*RuleOptions) (*rest.Config, error) {
 		}
 		return nil, err
 	}
-	return cfg, nil
+	return &Config{RestConfig: cfg, Identity: opts.Idenitity, Context: opts.CurrentContext}, nil
 }

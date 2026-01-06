@@ -1,7 +1,7 @@
 package owner
 
 import (
-	"github.com/mandelsoft/kubedns/pkg/objutils"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/objutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

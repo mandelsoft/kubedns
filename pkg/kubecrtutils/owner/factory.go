@@ -8,7 +8,7 @@ import (
 type RemoteFactory func(scheme *runtime.Scheme, cluster string) OwnerHandler
 
 func For(owner types.Cluster, slave types.Cluster, fac ...RemoteFactory) OwnerHandler {
-	return ForNames(owner.GetScheme(), owner.GetEffective().GetName(), slave.GetEffective().GetName(), fac...)
+	return ForNames(owner.GetScheme(), owner.GetId(), slave.GetEffective().GetName(), fac...)
 }
 
 func ForNames(scheme *runtime.Scheme, owner string, slave string, fac ...RemoteFactory) OwnerHandler {

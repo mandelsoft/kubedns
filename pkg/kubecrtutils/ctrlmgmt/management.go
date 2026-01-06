@@ -3,6 +3,8 @@ package ctrlmgmt
 import (
 	"context"
 	"fmt"
+	"slices"
+	"sort"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils"
@@ -55,6 +57,30 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 	} else {
 		indices = cacheindex.NewIndices()
 	}
+
+	list := []string{}
+	defcluster := false
+	for n := range clusters.Elements {
+		if n == cluster.DEFAULT {
+			defcluster = true
+		} else {
+			list = append(list, n)
+		}
+	}
+	sort.Strings(list)
+	if defcluster {
+		list = slices.Insert(list, 0, cluster.DEFAULT)
+	}
+
+	for _, n := range list {
+		c := clusters.Get(n)
+		if c == c.GetEffective() {
+			logger.Info("using configured cluster {{cluster}}[{{identity}}] accessing {{apiserver}}", "cluster", n, "effective", c.GetEffective().GetName(), "identity", c.GetId(), "apiserver", c.GetConfig().Host)
+		} else {
+			logger.Info("using logical cluster {{cluster}} mapped to {{effective}}", "cluster", n, "effective", c.GetEffective().GetName())
+		}
+	}
+
 	cm := &_controllermanager{
 		Element:    internal.NewElement(def.GetName()),
 		logger:     logger,

@@ -2,13 +2,13 @@ package kubeconfigopts
 
 import (
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster/restconfig"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster/config"
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/rest"
 )
 
 type Options struct {
-	rules  restconfig.Rules
+	rules  config.Rules
 	config *rest.Config
 }
 
@@ -20,17 +20,19 @@ var (
 	_ flagutils.Options = (*Options)(nil)
 )
 
-func New(rules ...restconfig.Rule) *Options {
-	if len(rules) == 0 {
-		rules = []restconfig.Rule{restconfig.DefaultRules()}
-	}
-	return &Options{rules: restconfig.NewRules(rules...)}
+func New(rules ...config.Rule) *Options {
+	return &Options{rules: config.NewRules(rules...)}
 }
 
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	o.rules.AddFlags(fs)
 }
 
-func (o *Options) GetConfig(*restconfig.RuleOptions) (*rest.Config, error) {
-	return o.rules.GetConfig(nil)
+func (o *Options) GetConfig(*config.ConfigOptions) (*rest.Config, *config.ConfigOptions, error) {
+	var opts config.ConfigOptions
+	cfg, err := o.rules.GetConfig(&opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	return cfg, &opts, nil
 }

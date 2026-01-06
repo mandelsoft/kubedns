@@ -72,8 +72,12 @@ type Cluster interface {
 	enqueue.Mux
 
 	GetName() string
+	GetId() string
+
 	GetEffective() Cluster
+	Unwrap() Cluster
 	GetCluster() cluster.Cluster
+
 	GetIndex(name string) Index
 
 	GetTypeConverter() managedfields.TypeConverter

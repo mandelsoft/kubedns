@@ -37,13 +37,13 @@ func init() {
 // nolint:gocyclo
 func main() {
 
-	setup.ExitIfErr(hostedzone.TestRenderManifests(), "problems with included manifests")
+	setup.ExitIfErr(hostedzone.TestRenderManifests(setup.Log), "problems with included manifests")
 
-	def := ctrlmgmt.Define("coredns.mandelsoft.org", "dataplane").
+	def := ctrlmgmt.Define(corednsv1alpha1.GroupVersion.Group, "dataplane").
 		WithScheme(scheme).
 		AddCluster(
-			cluster.Define("runtime", "runtime cluster").WithFallback(cluster.DEFAULT),
-			cluster.Define("dataplane", "user api cluster").WithFallback("runtime"),
+			cluster.Define("runtime", "runtime cluster").WithFallback("dataplane"),
+			cluster.Define("dataplane", "user api cluster").WithFallback(cluster.DEFAULT),
 		).
 		AddController(
 			hostedzone.Controller(),

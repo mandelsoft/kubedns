@@ -10,6 +10,7 @@ type Group[T Named] interface {
 	Get(name string) T
 	Add(elem ...T) error
 	Elements(yield func(string, T) bool)
+	Len() int
 }
 
 type _group[T Named] struct {
@@ -28,6 +29,11 @@ func newGroup[T Named](name string) _group[T] {
 
 func (c *_group[T]) GetName() string {
 	return c.typename
+}
+
+func (c *_group[T]) Len() int {
+	defer c.Lock()()
+	return len(c.elements)
 }
 
 func (c *_group[T]) Add(elem ...T) error {

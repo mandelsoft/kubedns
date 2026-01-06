@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mandelsoft/kubedns/pkg/render"
+	"github.com/mandelsoft/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -49,12 +50,12 @@ func PrintManifests() {
 	}
 }
 
-func TestRenderManifests() error {
+func TestRenderManifests(logger logging.Logger) error {
 	manifests, err := GetManifests()
 	if err != nil {
 		return err
 	}
-	ctx := NewReconcileContext(context.Background(), Log, "http://api.server", "aws", client.ObjectKey{Name: "myzone", Namespace: "default"})
+	ctx := NewReconcileContext(context.Background(), logger, "http://api.server", "aws", client.ObjectKey{Name: "myzone", Namespace: "default"})
 	ctx.Simulate = true
 
 	r := &HostedZoneReconciler{

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
-	"github.com/mandelsoft/kubedns/pkg/objutils"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/objutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

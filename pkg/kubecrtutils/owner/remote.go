@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/mandelsoft/goutils/general"
-	"github.com/mandelsoft/kubedns/pkg/objutils"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/objutils"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
