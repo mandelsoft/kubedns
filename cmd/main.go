@@ -10,6 +10,7 @@ import (
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/metricsopts"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/mlogopts"
 	"github.com/mandelsoft/kubedns/pkg/setup"
+	"github.com/spf13/pflag"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -38,6 +39,7 @@ func init() {
 func main() {
 
 	setup.ExitIfErr(hostedzone.TestRenderManifests(setup.Log), "problems with included manifests")
+	setup.ExitIfErr(hostedzone.TestRenderKubeDNSManifests(setup.Log), "problems with included dns manifests")
 
 	def := ctrlmgmt.Define(corednsv1alpha1.GroupVersion.Group, "dataplane").
 		WithScheme(scheme).
@@ -59,5 +61,8 @@ func main() {
 	)
 
 	err := ctrlmgmt.Setup(options, def, os.Args[1:]...)
+	if err == pflag.ErrHelp {
+		os.Exit(0)
+	}
 	setup.ExitIfErr(err, "setup controller manager")
 }

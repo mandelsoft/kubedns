@@ -85,7 +85,7 @@ func (r *ReconcilationRequest) handleObject() reconcile.Problem {
 	}
 
 	// create summary
-	state := "Ready"
+	state := corednsv1alpha1.STATE_READY
 	msg := ""
 	if baseerr != nil {
 		state = "Invalid"
@@ -102,8 +102,8 @@ func (r *ReconcilationRequest) handleObject() reconcile.Problem {
 		}
 	}
 
-	if state == "Ready" {
-		if zone.Status.State != "Ready" {
+	if state == corednsv1alpha1.STATE_READY {
+		if zone.Status.State != corednsv1alpha1.STATE_READY {
 			state = zone.Status.State
 			msg = zone.Status.Message
 		} else {

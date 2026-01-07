@@ -43,10 +43,11 @@ import (
 const INDEX_SASECFRET = "serviceaccount-secret"
 
 type Responsibility struct {
-	Root    *corednsv1alpha1.HostedZone
-	Parent  *corednsv1alpha1.HostedZone
-	Runtime string
-	Class   string
+	Root       *corednsv1alpha1.HostedZone
+	Parent     *corednsv1alpha1.HostedZone
+	RuntimeSet bool
+	Runtime    string
+	Class      string
 }
 
 // HostedZoneReconciler reconciles a HostedZone object
@@ -182,7 +183,7 @@ func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.L
 		}
 		obj = &parent
 	}
-	return &Responsibility{Root: obj, Parent: directParent, Runtime: String(obj.Spec.Runtime, ""), Class: String(obj.Spec.Class, "")}, true, nil
+	return &Responsibility{Root: obj, Parent: directParent, Runtime: String(obj.Spec.Runtime, ""), RuntimeSet: obj.Spec.Runtime != nil, Class: String(obj.Spec.Class, "")}, true, nil
 }
 
 func (r *HostedZoneReconciler) UpdateCondition(ctx context.Context, logger logging.Logger, instance *corednsv1alpha1.HostedZone, c metav1.Condition, mod ...bool) (bool, error) {

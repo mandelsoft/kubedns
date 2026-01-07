@@ -33,10 +33,10 @@ func CreateReconciler(ctx context.Context, controller controller.Controller[core
 	if err != nil {
 		return nil, err
 	}
-	logger.Info("creating hostedzone reconciler...")
+	logger.Info("creating entry reconciler...")
 
 	d := controller.GetControllerManager().GetControllerDefinition(common.ControllerHostedzone)
-	
+
 	r := &CoreDNSEntryReconciler{
 		Reconciler: base,
 		Options:    &d.GetOptions().(*hostedzone.ReconcilerFactory).Options,

@@ -4,7 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/name: kubedns
     app.kubernetes.io/managed-by: kustomize
-  name: manager-rolebinding
+  name: manager-runtime
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

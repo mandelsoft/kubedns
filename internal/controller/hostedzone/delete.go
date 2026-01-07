@@ -1,8 +1,6 @@
 package hostedzone
 
 import (
-	"fmt"
-
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubedns/pkg/render"
@@ -12,7 +10,6 @@ import (
 func (r *ReconcileRequest) DeleteExternalResources() Problem {
 
 	values, _ := r.Values(r.reconciler.Mode, true)
-
 	r.Info("rendering manifests to determine objects to be deleted")
 	dataplane, runtime, err := render.Render(r.reconciler.Manifests, values)
 	if err != nil {
@@ -25,7 +22,31 @@ func (r *ReconcileRequest) DeleteExternalResources() Problem {
 		return Failed(err)
 	}
 
-	var prob Problem
+	dnsctx := DNSContext{
+		ReconcileRequest: r,
+		Delete:           true,
+	}
+	dnsdataplane, dnsruntime, prob := r.reconciler.Options.DNSHandler.Manifests(&dnsctx, values)
+	if prob != nil {
+		return prob
+	}
+	if len(dnsruntime) > 0 {
+		r.Info("deleting nameserver dns runtime resources")
+		for _, data := range runtime {
+			prob = AggregateProblem(prob, r.Delete(r.reconciler.Runtime, data))
+		}
+	}
+	if len(dnsdataplane) > 0 {
+		r.Info("deleting nameserver dns dataplane resources")
+		for _, data := range dataplane {
+			prob = AggregateProblem(prob, r.Delete(r.reconciler.DataPlane, data))
+		}
+	}
+	if prob != nil {
+		r.Error("error deleting dns mode objects: {{error}}", "error", prob.Message())
+		return prob
+	}
+
 	r.Info("deleting runtime resources")
 	for _, data := range runtime {
 		prob = AggregateProblem(prob, r.Delete(r.reconciler.Runtime, data))
@@ -40,7 +61,7 @@ func (r *ReconcileRequest) DeleteExternalResources() Problem {
 		r.Info("cleanup deployment mode")
 		prob = r.reconciler.Mode.Cleanup(r.ReconcileContext, values["dataplane"].(map[string]interface{})["name"].(string))
 		if prob != nil {
-			err = fmt.Errorf("error cleanup  mode: %s", prob.Message())
+			r.Error("error cleanup  mode: {{error}}", "error", prob.Message())
 		}
 	}
 	return prob

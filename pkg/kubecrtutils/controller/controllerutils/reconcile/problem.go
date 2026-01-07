@@ -24,7 +24,7 @@ type problem struct {
 	err     error
 }
 
-// Requeue requests a ratelimmeted back off without reporting a reconcilation error
+// Requeue requests a ratelimited back off without reporting a reconcilation error
 // iff there is an error given.
 func Requeue(err error) Problem {
 	if err == nil {

@@ -10,7 +10,7 @@ import (
 )
 
 func Setup(opts flagutils.OptionSet, def Definition, args ...string) error {
-	fs := &pflag.FlagSet{}
+	fs := pflag.NewFlagSet("kubedns", pflag.ContinueOnError)
 
 	found := From(opts)
 	if found != nil {

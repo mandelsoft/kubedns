@@ -1,121 +1,154 @@
 # kubedns
-// TODO(user): Add simple overview of use/purpose
+
+An environment to manage hosted zones and appropriate authoritative name servers for the Domain Name System with Kubernetes resources.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
 
-## Getting Started
+This project provides a controller-manager managing the deployment of
+[kubednydns](https://github.com/mandelsoft/kubedyndns) DNS servers configured as slave servers to manage DNS entries for a hosted zone. Hosted zones, as well as DNS records in those zones are described by Kubernetes resources `HostedZone` and `CoreDNSEntry`  in namespaces. The DNS server is a [coredns](https://github.com/coredns/coredns) server known from Kubernetes enriched with the *kubedyndns* plugin able to serve DNS records defined by Kubernetes resources.
 
-### Prerequisites
+For every root zone such a dns server is deployed acting as *Authoritative Name Server* for this zone and locally configured nested zones.
+
+## Basic Architecture
+
+### User-facing API
+
+This system uses two custom resources `HostedZone`and `CoreDNSEntry` to configure authoritative name servers.
+`HostedZone` objects can be maintained in namespaces and describe a hosted zone with all its properties.
+`CoreDNSEntriy` objects relate to a hosted zone in the same namespace and describe domains known to this zone.
+Supported are A, CNAME, TXT, SRV and NS records.
+An entry object may describe multiple record
+types. A namespace may define multiple related or unrelated hosted zones.
+
+Nested zones can be configured by NS records referring to another name server, or by a nested local hosted zone. Those zone objects have a parent reference to their parent zone object.
+
+Every zone or entry object may define multiple domains. Hereby, only the root zone defines  FQDNs, nested zones and records define names relative to their zone.
+
+This way a zone object can formally describe multiple identical zones with different root domains.
+A record then finally describes a set of domain names according to the cartesian product ( R x N ... N x E) of the name sets along the nesting hierarchy (R Root zone, N sequenece of nested zones, E entry object).
+The final set of names will be reported in the status of the entry objects.
+
+### Implementation 
+
+For every root zone object a separate DNS server is deployed, it serves all the configured base domains and all the locally nested zones, also.
+
+The deployment consists of a Kubernetes `Deployment` and a `Service` used to expose the DNS port via a load-balancer (for UPD no shared ingress load-balancer can be used)
+For the deployment an own `ServiceAccount` and RBAC rules are created to restrict the access of the server to the namespace of the hosted zone object.
+
+If a separate runtime cluster is used additionally a service account `Secret` is created in the API namespace, which is propagated to the runtime cluster to enable the access to the namespace in the dataplane.
+
+## Operational modes
+
+### API/Runtime Organization
+
+The controller is able to work with different operational modes
+requiring one or two Kubernetes dataplanes.
+- *Vanilla Mode*: A single cluster is used for the end-user (this is the API) to configure zones and records and to deploy the runtime for the dns servers. The dns servers and required additional resources are deployed into the user namespace. API users should only have permissions for the dns resources.
+
+- *Distinguished Vanilla Mode*: The runtime resources are deployed into a separate runtime namespace not accessible by the end users
+
+- *Multi-Cluster Mode*: The Kubernetes dataplane used by the end-users to configure their zones and records is separated from the runtime cluster used to deploy the server runtime.
+  This API dataplane can be a nodeless Kubernetes cluster just used as API for manageing zones and records (for example a [Gardener](https://gardener.cloud) Nodeless Shoot), but also any other user-facing cluster.
+   The deployment of such a combination of API-server, etcd and kube-controller-manager into the runtime cluster is possible but not supported by this project, yet.
+    
+    The runtime cluster can be configured to use a single namespace to deploy the implementation resources, or
+    to use dedicated namespace shadowing the API namespaces.
+
+### DNS support accessing the Nameservers
+
+A nameserver requires a CNAME to be configurable for an NS record to bind it into a DNS tree.
+
+The controller provides an interface for provisioning such names. There are three implementations part of this code base.
+
+- `loadbalancer`: If the UDP load-balancer configured for a service provides CNAMEs, such names can directly be used.
+  But it is not guaranteed that this name is stable after recreating the service (in case of some lost resources)
+- `gardener`: Gardener supports an out-of-the-box DNS sub-domain exclusively for a cluster. This mode configures a stable CNAME unique for every root hosted zone under this domain.
+- `kubedns`: It uses its own resources to publish a CNAME.
+  Therefore, a separate explicit deployment of a `kubedyndns` service is required (similar to the ones managed by this controller-manager). This service must be bound to some accessible CNAME and added via NS records to some DNS tree used in the local environment.
+    It uses a reserved API namespace `dns-system` to maintain the DNS records for the managed name servers and must use a different `class`.
+    for its hosted zones to define a separate management responsibility for such hosted zones.
+
+### Sharding
+
+The controller is prepared for controller-sharding in two dimensions.
+
+- a `class` attribute can be used to run multiple service environments in one API dataplane. Every environment should then use its own runtime environments and controllers.
+- a `runtime` attribute can be used together with a scheduler (not included) to support the distribution of the dns servers into multiple runtime clusters. In this case controllers must be started separately for every runtime cluster with different non-empty runtime attributes set.
+  This feature can be used to manage a highly scalable environment. The automatic management of such an environment is not included in this project. 
+- 
+## IaaS Support
+
+Special support is currently available for AWS, requiring
+a dedicated load-balancer (NLB) type to serve UDP requests.
+
+If other environments also require such a special handling,
+there is an interface to plug-in such support, but it is not available as part of this project (Feel free to contribute).
+
+## Options
+
+```
+Usage of kubedns:
+--class string                           name of the controller class to handle
+--dataplane-kubeconfig string            user api cluster
+--dataplane-kubeconfig-context string    context used together with dataplane-kubeconfig
+--dataplane-kubeconfig-identity string   context used together with dataplane-kubeconfig
+--dns-class string                       DNS class for managed nameserver DNS names (default "dns-system")
+--dns-domain string                      DNS domain for managed nameserver DNS names
+--dns-mode string                        DNS mode for providing nameserver cnames [gardener,kubedns,loadbalancer] (default "loadbalancer")
+--enable-http2                           If set, HTTP/2 will be enabled for the metrics and webhook servers
+--health-probe-bind-address string       The address the probe endpoint binds to. (default ":8081")
+--iaas string                            IaaS layer to use (special support so far for "aws" (default "default")
+--kubeconfig string                      path to standard kubeconfig
+--kubeconfig-context string              context used together with kubeconfig
+--kubeconfig-identity string             context used together with kubeconfig
+--leader-elect                           Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.
+--leader-elect-namespace string          leader election namespace
+--leader-election-id string              Id for leader election
+--log-level string                       logging level (default "info")
+--log-rule stringToString                logging rules (default [])
+--metrics-bind-address string            The address the metrics endpoint binds to. Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service. (default "0")
+--metrics-cert-key string                The name of the metrics server key file. (default "tls.key")
+--metrics-cert-name string               The name of the metrics server certificate file. (default "tls.crt")
+--metrics-cert-path string               The directory that contains the metrics server certificate.
+--metrics-secure                         If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead. (default true)
+--ns-namespace string                    namespace used to request nameserver DNS names (default "dns-system")
+--runtime string                         name of the runtime class to handle
+--runtime-kubeconfig string              runtime cluster
+--runtime-kubeconfig-context string      context used together with runtime-kubeconfig
+--runtime-kubeconfig-identity string     context used together with runtime-kubeconfig
+--runtime-namespace string               use single runtime namespace for deployments## Getting Started
+```
+
+## System Setup
+
+### Single Cluster Setup
+
+Deploy CRDs, the dataplane and runtime RBAC objects into the cluster. Afterwards, deploy the dataplane controller-manager into the `dns-system` namespace
+using in-cluster access for the default cluster (no kubeconfig options)
+
+If you add the `runtime-namespace` option to the controller, the service deployments with be centrally done in this namespace (typically use `dns-runtime`)
+
+### Multi-CLuster Setup
+
+Deploy CRDS and the dataplane RBAC objects to your dataplane cluster
+and the runtime RBAC objects into the runtime cluster(s)
+
+Then you must create a kubeconfig for the service account token created in the `dns-system` namespace and add it to a secret (`controller-manager-dataplane`) in the `dns-system` namespace of the runtime cluster (`KUBECONFIG=<dataplane kubeconfig> bin/create-kc -r <runtime kubeconfig>`)
+
+Afterwards, deploy the runtime controller-manager into the `dns-system` namespace of your runtime cluster
+
+### Local Setup
+
+You can run the controller locally using your system kubeconfigs.
+To run the controller with the same access permissions than a deployed one,
+you can create the appropriate kubeconfigs with `bin/create -c <clustername> -a` with the appropriate kubeconfigs (if your kubeconfig files are named `dns.runtime` and/or `dns.apii` you can omit option `-c`) 
+
+ ### Prerequisites
 - go version v1.24.6+
 - docker version 17.03+.
 - kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+- Access to one or two Kubernetes v1.11.3+ cluster.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
-
-```sh
-make docker-build docker-push IMG=<some-registry>/kubedns:tag
-```
-
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
-
-**Install the CRDs into the cluster:**
-
-```sh
-make install
-```
-
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
-
-```sh
-make deploy IMG=<some-registry>/kubedns:tag
-```
-
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
-
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
-
-```sh
-kubectl apply -k config/samples/
-```
-
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
-
-```sh
-kubectl delete -k config/samples/
-```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
-make undeploy
-```
-
-## Project Distribution
-
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/kubedns:tag
-```
-
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/kubedns/<tag or branch>/dist/install.yaml
-```
-
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
-
-```sh
-kubebuilder edit --plugins=helm/v2-alpha
-```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
 
 ## License
 

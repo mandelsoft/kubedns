@@ -370,13 +370,31 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 
 		// apply additional resources required by DNS provisioning for name servers
 		modified.Clear()
-		for _, data := range r.reconciler.Options.DNSHandler.Manifests(&dnsctx, values) {
-			_, err := r.ApplyData(octx, data, &modified)
-			if err != nil {
-				return TemporaryProblem(err)
+
+		dnsdataplane, dnsruntime, prob := r.reconciler.Options.DNSHandler.Manifests(&dnsctx, values)
+		if prob != nil {
+			return prob
+		}
+		if len(dnsdataplane) > 0 {
+			r.Info("found {{amount}} dns dataplane manifests", "amount", len(dnsdataplane))
+			for _, data := range dnsdataplane {
+				_, err := clusterutils2.ClientSideApply(r.reconciler.DataPlane, r, data, &modified)
+				if err != nil {
+					return TemporaryProblemf("error deploying nameserver dns dataplane: %s", err.Error())
+				}
+			}
+		}
+		if len(dnsruntime) > 0 {
+			r.Info("found {{amount}} dns dataplane manifests", "amount", len(dnsdataplane))
+			for _, data := range dnsruntime {
+				_, err := r.ApplyData(octx, data, &modified)
+				if err != nil {
+					return TemporaryProblemf("error deploying nameserver dns runtime: %s", err.Error())
+				}
 			}
 		}
 		modified.Report(r.reconciler.recorder, "DNSExtensions", r.instance)
+		modified.Clear()
 
 		var sum Problem
 		var deployment appsv1.Deployment
@@ -415,7 +433,6 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		}
 
 		var cnames []string
-		var prob Problem
 		if dnsctx.Service != nil {
 			cnames, prob = r.reconciler.Options.DNSHandler.GetCNames(&dnsctx)
 			sum = AggregateProblem(sum, prob)
