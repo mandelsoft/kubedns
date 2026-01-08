@@ -137,7 +137,7 @@ spec:
             type: object
             x-kubernetes-validations:
             - message: Cannot set both class and/or runtime and parentRef
-              rule: '!(has(self.class) || has(self.runtime)) && has(self.parentRef)'
+              rule: '!((has(self.class) || has(self.runtime)) && has(self.parentRef))'
             - message: class is immutable
               rule: '!has(oldSelf.class) || self.class == oldSelf.class'
           status:

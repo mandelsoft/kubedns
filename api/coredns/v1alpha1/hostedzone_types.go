@@ -26,7 +26,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // HostedZoneSpec defines the desired state of HostedZone
-// +kubebuilder:validation:XValidation:rule="!(has(self.class) || has(self.runtime)) && has(self.parentRef)",message="Cannot set both class and/or runtime and parentRef"
+// +kubebuilder:validation:XValidation:rule="!((has(self.class) || has(self.runtime)) && has(self.parentRef))",message="Cannot set both class and/or runtime and parentRef"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.class) || self.class == oldSelf.class",message="class is immutable"
 type HostedZoneSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -166,7 +166,7 @@ type HostedZone struct {
 }
 
 // +kubebuilder:object:root=true
-
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // HostedZoneList contains a list of HostedZone
 type HostedZoneList struct {
 	metav1.TypeMeta `json:",inline"`

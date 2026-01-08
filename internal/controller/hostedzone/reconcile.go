@@ -385,7 +385,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 			}
 		}
 		if len(dnsruntime) > 0 {
-			r.Info("found {{amount}} dns dataplane manifests", "amount", len(dnsdataplane))
+			r.Info("found {{amount}} dns runtime manifests", "amount", len(dnsdataplane))
 			for _, data := range dnsruntime {
 				_, err := r.ApplyData(octx, data, &modified)
 				if err != nil {

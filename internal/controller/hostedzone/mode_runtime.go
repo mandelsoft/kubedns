@@ -120,7 +120,9 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) Problem {
 	}
 
 	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
-	if len(m.index.UsersFor(INDEX_SASECFRET, key)) != 0 {
+	found := len(m.index.UsersFor(INDEX_SASECFRET, key))
+	if found != 0 {
+		m.Info("found still {{amount}} zones", "amount", found)
 		return nil
 	}
 
@@ -149,18 +151,31 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) Problem {
 	if m.Options.RuntimeNamespace == "" {
 		var ns v1.Namespace
 		namespace := m.RuntimeNamespace(ctx.ObjectKey)
+		m.Info("deleting namespace {{namespace}}", "namespace", namespace)
 		err := m.Runtime.Get(ctx, client.ObjectKey{Name: namespace}, &ns)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				return nil
+			if !errors.IsNotFound(err) {
+				return TemporaryProblem(err)
 			}
-			return TemporaryProblem(err)
+			m.Info("namespace {{namespace}} already deleted", "namespace", namespace)
+		} else {
+			if ns.DeletionTimestamp.IsZero() {
+				err := m.Runtime.Delete(ctx, &ns)
+				if err != nil {
+					if !errors.IsNotFound(err) {
+						return TemporaryProblem(err)
+					}
+					m.Info("namespace {{namespace}} already deleted", "namespace", namespace)
+				}
+			} else {
+				m.Info("namespace {{namespace}} still deleting", "namespace", namespace)
+			}
 		}
 		if len(ns.Finalizers) > 0 {
 			return Requeuef("waiting for namespace finalizers to be removed")
 		}
 
 	}
-	ctx.Info("cleanup successful")
+	ctx.Info("cleanup completed")
 	return nil
 }

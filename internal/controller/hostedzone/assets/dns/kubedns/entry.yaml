@@ -9,7 +9,6 @@ metadata:
     app: (( values.runtime.label ))
 spec:
   zoneRef: nameserver
-  class: (( values.dns.class || ~~ ))
   dnsNames: (( values.dns.dnsnames ))
   A: (( values.dns.ips || ~~ ))
-  CNames: (( values.dns.cnames || ~~ ))
+  CNAME: (( values.dns.cname || ~~ ))

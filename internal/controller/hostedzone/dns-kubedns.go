@@ -67,19 +67,19 @@ func (d *dnsKubedns) Manifests(ctx *DNSContext, values map[string]interface{}) (
 	dns := map[string]interface{}{
 		"name":      d.getEntryName(ctx),
 		"namespace": d.namespace,
-		"dnsnames":  dnsnames,
+		"dnsnames":  sliceutils.Convert[any](dnsnames),
 	}
 	if d.class != "" {
 		dns["class"] = d.class
 	}
 	if len(ips) > 0 {
-		dns["ips"] = sliceutils.Transform(ips, net.IP.String)
+		dns["ips"] = sliceutils.Transform(ips, func(ip net.IP) any { return net.IP.String(ip) })
 	}
 	if len(cnames) > 0 {
-		dns["cnames"] = cnames
+		dns["cname"] = cnames[0]
 	}
 	values["dns"] = dns
-	dataplane, runtime, err := render.Render(map[string][]byte{"entry": manifests["entry.yaml"]}, values)
+	dataplane, runtime, err := render.Render(manifests, values)
 	if err != nil {
 		return nil, nil, reconcile.Failedf("cannot get dns manifests: %s", err.Error())
 	}
@@ -99,7 +99,7 @@ func (d *dnsKubedns) GetCNames(ctx *DNSContext) ([]string, reconcile.Problem) {
 	}
 
 	var entry corednsv1alpha1.CoreDNSEntry
-	err := ctx.reconciler.Runtime.Get(ctx, client.ObjectKey{Namespace: "dns-system", Name: d.getEntryName(ctx)}, &entry)
+	err := ctx.reconciler.DataPlane.Get(ctx, client.ObjectKey{Namespace: "dns-system", Name: d.getEntryName(ctx)}, &entry)
 	if err != nil {
 		return nil, reconcile.TemporaryProblem(err)
 	}
