@@ -6,8 +6,9 @@ import (
 	"strings"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/kubedns/pkg/clusterutils"
-	"github.com/mandelsoft/kubedns/pkg/options/manageropts"
+	"github.com/mandelsoft/goutils/errors"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/manageropts"
 	"github.com/spf13/pflag"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -42,7 +43,7 @@ func NewOptions() *Options {
 func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	var err error
 
-	clusters, err := clusterutils.ValidatedClusters(ctx, opts, v)
+	clusters, err := cluster.ValidatedClusters(ctx, opts, v)
 	if err != nil {
 		return err
 	}
@@ -54,7 +55,7 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 	}
 
 	o.DNSHandler, err = DNSModes.Create(ctx, o.DNSMode, o)
-	return err
+	return errors.Wrapf(err, "dns mode %q", o.DNSMode)
 }
 
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
@@ -65,12 +66,12 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVarP(&o.DNSMode, "dns-mode", "", "loadbalancer", fmt.Sprintf("DNS mode for providing nameserver cnames [%s]", strings.Join(modes, ",")))
 	fs.StringVarP(&o.DNSDomain, "dns-domain", "", "", "DNS domain for managed nameserver DNS names")
-	fs.StringVarP(&o.DNSClass, "dns-class", "", "", "DNS class for managed nameserver DNS names")
-	fs.StringVarP(&o.DNSNamespace, "ns-namespace", "", "", "namespace used to request nameserver DNS names")
+	fs.StringVarP(&o.DNSClass, "dns-class", "", "dns-system", "DNS class for managed nameserver DNS names")
+	fs.StringVarP(&o.DNSNamespace, "ns-namespace", "", "dns-system", "namespace used to request nameserver DNS names")
 	fs.StringVarP(&o.Platform, "iaas", "", "default", "IaaS layer to use (special support so far for \"aws\"")
 }
 
-func (o *Options) Configure(ctx context.Context, cfg *ctrl.Options, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
+func (o *Options) Configure(ctx context.Context, cfg *ctrl.Options, opts flagutils.OptionSet) error {
 	if o.Runtime != "" {
 		cfg.LeaderElectionID = o.Runtime + "-" + cfg.LeaderElectionID
 	}

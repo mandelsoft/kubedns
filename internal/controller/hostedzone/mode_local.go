@@ -3,7 +3,7 @@ package hostedzone
 import (
 	"fmt"
 
-	"github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

@@ -23,10 +23,10 @@ import (
 	"time"
 
 	"github.com/mandelsoft/kubedns/internal/controller/common"
-	"github.com/mandelsoft/kubedns/pkg/clusterutils"
-	. "github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
-	"github.com/mandelsoft/kubedns/pkg/index"
-	"github.com/mandelsoft/kubedns/pkg/owner"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
+	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/index"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/owner"
 	"github.com/mandelsoft/logging"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -43,10 +43,11 @@ import (
 const INDEX_SASECFRET = "serviceaccount-secret"
 
 type Responsibility struct {
-	Root    *corednsv1alpha1.HostedZone
-	Parent  *corednsv1alpha1.HostedZone
-	Runtime string
-	Class   string
+	Root       *corednsv1alpha1.HostedZone
+	Parent     *corednsv1alpha1.HostedZone
+	RuntimeSet bool
+	Runtime    string
+	Class      string
 }
 
 // HostedZoneReconciler reconciles a HostedZone object
@@ -59,13 +60,16 @@ type HostedZoneReconciler struct {
 	Manifests map[string][]byte
 
 	Options *Options
-	Runtime clusterutils.Cluster
+	Runtime cluster.Cluster
 
 	runtimeOwner owner.OwnerHandler
-	dns          DNSHandler
 	recorder     record.EventRecorder
 
 	index index.UntypedIndex
+}
+
+func (r *HostedZoneReconciler) IsSeparateRuntime() bool {
+	return r.Options.RuntimeNamespace != "" || !r.DataPlane.IsSameAs(r.Runtime)
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -78,7 +82,7 @@ type HostedZoneReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.4/pkg/reconcile
 func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := Log.WithName(req.String()).WithValues("object", req.NamespacedName)
+	logger := r.WithName(req.String()).WithValues("object", req.NamespacedName)
 
 	var after time.Duration
 
@@ -126,21 +130,29 @@ func (r *HostedZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return Result(logger, prob, after)
 }
 
-func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger logging.Logger, obj client.ObjectKey) {
+func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger logging.Logger, obj client.ObjectKey) error {
 	logger.Info("notify children about changes")
-	children := r.GetNestedZones(ctx, obj.Namespace, obj.Name)
+	children, err := r.GetNestedZones(ctx, obj.Namespace, obj.Name)
+	if err != nil {
+		return err
+	}
 	for _, c := range children {
 		logger.Info("triggering child", "name", c.Name, "namespace", c.Namespace)
 		r.DataPlane.EnqueueByObject(&c)
 	}
+	return nil
 }
 
-func (r *HostedZoneReconciler) TriggerEntries(ctx context.Context, logger logging.Logger, obj client.ObjectKey) {
-	entries := r.GetEntriesForZone(ctx, obj.Namespace, obj.Name)
+func (r *HostedZoneReconciler) TriggerEntries(ctx context.Context, logger logging.Logger, obj client.ObjectKey) error {
+	entries, err := r.GetEntriesForZone(ctx, obj.Namespace, obj.Name)
+	if err != nil {
+		return err
+	}
 	logger.Info("notify {{amount}} children about changes", "amount", len(entries))
 	for _, c := range entries {
 		r.DataPlane.EnqueueByObject(&c)
 	}
+	return nil
 }
 
 func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.Logger, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, Problem) {
@@ -155,7 +167,7 @@ func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.L
 		if slices.Contains(hist, obj.Spec.ParentRef) {
 			return nil, true, Failedf("reference cyle %s", path)
 		}
-		err := r.DataPlane.Get(ctx, client.ObjectKey{obj.GetNamespace(), obj.Spec.ParentRef}, &parent)
+		err := r.DataPlane.Get(ctx, client.ObjectKey{Namespace: obj.GetNamespace(), Name: obj.Spec.ParentRef}, &parent)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil, true, Failedf("parent %s not found", obj.Spec.ParentRef)
@@ -170,7 +182,7 @@ func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.L
 		}
 		obj = &parent
 	}
-	return &Responsibility{Root: obj, Parent: directParent, Runtime: String(obj.Spec.Runtime, ""), Class: String(obj.Spec.Class, "")}, true, nil
+	return &Responsibility{Root: obj, Parent: directParent, Runtime: String(obj.Spec.Runtime, ""), RuntimeSet: obj.Spec.Runtime != nil, Class: String(obj.Spec.Class, "")}, true, nil
 }
 
 func (r *HostedZoneReconciler) UpdateCondition(ctx context.Context, logger logging.Logger, instance *corednsv1alpha1.HostedZone, c metav1.Condition, mod ...bool) (bool, error) {

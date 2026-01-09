@@ -125,7 +125,7 @@ type CoreDNSStatus struct {
 	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
-	
+
 	// State of the dns entry object
 	// +optional
 	State string `json:"state,omitempty"`
@@ -144,6 +144,12 @@ type CoreDNSStatus struct {
 	// +optional
 	EffectiveDomainNames []string `json:"effectiveDomainNames,omitempty"`
 }
+
+// STATE_READY is used by the hostedzone controller for slave mode of dns server.
+const STATE_READY = "Ready"
+
+// STATE_OK is used by dns server in non-slave mode to set final state.
+const STATE_OK = "Ok"
 
 func init() {
 	SchemeBuilder.Register(&CoreDNSEntry{}, &CoreDNSEntryList{})

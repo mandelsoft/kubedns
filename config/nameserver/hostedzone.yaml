@@ -1,0 +1,16 @@
+
+kind: HostedZone
+apiVersion: coredns.mandelsoft.org/v1alpha1
+metadata:
+  name: nameserver
+  namespace: dns-system
+spec:
+  class: dns-service
+  domainNames:
+  - nameservers.demo
+  email: uwe.krueger@mandelsoft.de
+  refresh: 7200
+  retry: 3600
+  expire: 1209600
+  minimumTTL: 3600
+  

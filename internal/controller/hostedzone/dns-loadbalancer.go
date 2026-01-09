@@ -3,8 +3,7 @@ package hostedzone
 import (
 	"context"
 
-	"github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
 )
 
 func init() {
@@ -12,18 +11,11 @@ func init() {
 }
 
 type dnsLoadbalancer struct {
+	DNSDummy
 }
 
 func NewDNSByLoadBalancer(ctx context.Context, opts *Options) (DNSHandler, error) {
 	return &dnsLoadbalancer{}, nil
-}
-
-func (l *dnsLoadbalancer) Manifests(ctx *DNSContext, values map[string]interface{}) [][]byte {
-	return nil
-}
-
-func (l *dnsLoadbalancer) Modify(ctx *DNSContext, obj client.Object) error {
-	return nil
 }
 
 func (l *dnsLoadbalancer) GetCNames(ctx *DNSContext) ([]string, reconcile.Problem) {

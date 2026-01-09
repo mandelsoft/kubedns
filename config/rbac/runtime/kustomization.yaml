@@ -7,7 +7,6 @@ resources:
 # runtime. Be sure to update RoleBinding and ClusterRoleBinding
 # subjects if changing service account names.
 - service_account.yaml
-- secret.yaml
 - role.yaml
 - role_binding.yaml
 

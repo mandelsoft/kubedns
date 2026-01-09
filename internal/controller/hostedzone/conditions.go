@@ -60,7 +60,7 @@ func (r *ReconcileRequest) summary() {
 							if c != nil {
 								msg = c.Message
 								if c.Status == metav1.ConditionTrue {
-									status = "Ready"
+									status = corednsv1alpha1.STATE_READY
 								}
 							}
 						} else { // NameServer access

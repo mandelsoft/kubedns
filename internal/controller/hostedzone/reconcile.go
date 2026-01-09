@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-test/deep"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/pkg/clusterutils"
-	. "github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
-	"github.com/mandelsoft/kubedns/pkg/owner"
+	clusterutils2 "github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
+	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/owner"
 	"github.com/mandelsoft/kubedns/pkg/render"
 	"github.com/mandelsoft/logging"
 	appsv1 "k8s.io/api/apps/v1"
@@ -34,7 +34,7 @@ type ReconcileRequest struct {
 	orig       *corednsv1alpha1.HostedZone
 }
 
-var _ clusterutils.OperationContext = (*ReconcileRequest)(nil)
+var _ clusterutils2.OperationContext = (*ReconcileRequest)(nil)
 
 func NewRequest(ctx context.Context, l logging.Logger, reconciler *HostedZoneReconciler, key client.ObjectKey, instance *corednsv1alpha1.HostedZone) *ReconcileRequest {
 	return &ReconcileRequest{
@@ -118,7 +118,7 @@ func (r *ReconcileRequest) Reconcile() Problem {
 			if err := r.reconciler.DataPlane.Patch(r, obj, patch); err != nil {
 				return TemporaryProblem(client.IgnoreNotFound(err))
 			}
-			r.Info("taking responsibilty")
+			r.Info("taking responsibility")
 		}
 	}
 
@@ -196,7 +196,7 @@ func (r *ReconcileRequest) IsResponsibile() (bool, *Responsibility, Problem) {
 		return new, info, nil
 	}
 
-	match := info.Root.Status.Observed.Class == r.reconciler.Options.Class && info.Root.Status.Observed.Class == r.reconciler.Options.Class
+	match := info.Root.Status.Observed.Class == r.reconciler.Options.Class && info.Root.Status.Observed.Runtime == r.reconciler.Options.Runtime
 	r.Info("checking registered match", "root", info.Root.Name, "match", new, "runtime", info.Root.Status.Observed.Runtime, "class", info.Root.Status.Observed.Class)
 	return match, info, nil
 
@@ -265,8 +265,8 @@ func (r *ReconcileRequest) Update() error {
 	return nil
 }
 
-func (r *ReconcileRequest) ApplyData(octx clusterutils.OperationContext, data []byte, mod ...*clusterutils.ModificationInfo) (*unstructured.Unstructured, error) {
-	o, err := clusterutils.ClientSideApply(r.reconciler.Runtime, octx, data, mod...)
+func (r *ReconcileRequest) ApplyData(octx clusterutils2.OperationContext, data []byte, mod ...*clusterutils2.ModificationInfo) (*unstructured.Unstructured, error) {
+	o, err := clusterutils2.ClientSideApply(r.reconciler.Runtime, octx, data, mod...)
 	if err != nil {
 		meta.SetStatusCondition(&r.instance.Status.Conditions, metav1.Condition{
 			Type:    corednsv1alpha1.RuntimeConditionType,
@@ -279,7 +279,7 @@ func (r *ReconcileRequest) ApplyData(octx clusterutils.OperationContext, data []
 	return o, err
 }
 
-func (r *ReconcileRequest) DeleteData(octx clusterutils.OperationContext, data []byte) Problem {
+func (r *ReconcileRequest) DeleteData(octx clusterutils2.OperationContext, data []byte) Problem {
 	return r.Delete(r.reconciler.Runtime, data)
 }
 
@@ -305,9 +305,9 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 
 	r.Info("updating dataplane")
 
-	var modified clusterutils.ModificationInfo
+	var modified clusterutils2.ModificationInfo
 	for _, data := range dataplane {
-		_, err := clusterutils.ClientSideApply(r.reconciler.DataPlane, r, data, &modified)
+		_, err := clusterutils2.ClientSideApply(r.reconciler.DataPlane, r, data, &modified)
 		if err != nil {
 			return TemporaryProblemf("error deploying dataplane: %s", err.Error())
 		}
@@ -331,7 +331,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		var svcName client.ObjectKey
 
 		r.Logger.Info("updating runtime")
-		octx := clusterutils.WithModification(r,
+		octx := clusterutils2.WithModification(r,
 			// set owners
 			owner.AddOwnerModifier(r.reconciler.runtimeOwner, r.instance),
 			// adapt to provide DNS records for nameservers
@@ -370,13 +370,31 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 
 		// apply additional resources required by DNS provisioning for name servers
 		modified.Clear()
-		for _, data := range r.reconciler.Options.DNSHandler.Manifests(&dnsctx, values) {
-			_, err := r.ApplyData(octx, data, &modified)
-			if err != nil {
-				return TemporaryProblem(err)
+
+		dnsdataplane, dnsruntime, prob := r.reconciler.Options.DNSHandler.Manifests(&dnsctx, values)
+		if prob != nil {
+			return prob
+		}
+		if len(dnsdataplane) > 0 {
+			r.Info("found {{amount}} dns dataplane manifests", "amount", len(dnsdataplane))
+			for _, data := range dnsdataplane {
+				_, err := clusterutils2.ClientSideApply(r.reconciler.DataPlane, r, data, &modified)
+				if err != nil {
+					return TemporaryProblemf("error deploying nameserver dns dataplane: %s", err.Error())
+				}
+			}
+		}
+		if len(dnsruntime) > 0 {
+			r.Info("found {{amount}} dns runtime manifests", "amount", len(dnsdataplane))
+			for _, data := range dnsruntime {
+				_, err := r.ApplyData(octx, data, &modified)
+				if err != nil {
+					return TemporaryProblemf("error deploying nameserver dns runtime: %s", err.Error())
+				}
 			}
 		}
 		modified.Report(r.reconciler.recorder, "DNSExtensions", r.instance)
+		modified.Clear()
 
 		var sum Problem
 		var deployment appsv1.Deployment
@@ -415,7 +433,6 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		}
 
 		var cnames []string
-		var prob Problem
 		if dnsctx.Service != nil {
 			cnames, prob = r.reconciler.Options.DNSHandler.GetCNames(&dnsctx)
 			sum = AggregateProblem(sum, prob)
@@ -463,7 +480,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 	return nil
 }
 
-func (r *ReconcileRequest) Delete(cluster clusterutils.Cluster, manifest []byte) Problem {
+func (r *ReconcileRequest) Delete(cluster clusterutils2.Cluster, manifest []byte) Problem {
 	obj := unstructured.Unstructured{}
 	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	_, _, err := dec.Decode(manifest, nil, &obj)

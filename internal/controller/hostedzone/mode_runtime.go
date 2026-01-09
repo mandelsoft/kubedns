@@ -4,7 +4,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	. "github.com/mandelsoft/kubedns/pkg/controllerutils/reconcile"
+	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/objutils"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,21 +25,21 @@ func (m *RuntimeMode) RuntimeNamespace(key client.ObjectKey) string {
 	if m.Options.RuntimeNamespace != "" {
 		return m.Options.RuntimeNamespace
 	}
-	return fmt.Sprintf("%s-%s", BASE, key.Namespace)
+	return objutils.GenerateUniqueName(BASE, "", key.Namespace, objutils.MAX_NAMESPACELEN)
 }
 
 func (m *RuntimeMode) RuntimeSecretName(key client.ObjectKey) string {
 	if m.Options.RuntimeNamespace != "" {
-		return fmt.Sprintf("%s-%s", BASE, key.Namespace)
+		return objutils.GenerateUniqueName(BASE, "", key.Namespace, objutils.MAX_NAMESPACELEN)
 	}
 	return fmt.Sprintf("%s", BASE)
 }
 
 func (m *RuntimeMode) RuntimeDeploymentName(key client.ObjectKey) string {
 	if m.Options.RuntimeNamespace != "" {
-		return fmt.Sprintf("%s-%s-%s", BASE, key.Namespace, key.Name)
+		return objutils.GenerateUniqueName(BASE, key.Namespace, key.Name, objutils.MAX_NAMELEN)
 	}
-	return fmt.Sprintf("%s-%s", BASE, key.Name)
+	return objutils.GenerateUniqueName(BASE, "", key.Name, objutils.MAX_NAMELEN)
 }
 
 func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting bool) (map[string]interface{}, error) {
@@ -120,7 +121,9 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) Problem {
 	}
 
 	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
-	if len(m.index.UsersFor(INDEX_SASECFRET, key)) != 0 {
+	found := len(m.index.UsersFor(INDEX_SASECFRET, key))
+	if found != 0 {
+		m.Info("found still {{amount}} zones", "amount", found)
 		return nil
 	}
 
@@ -149,18 +152,31 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) Problem {
 	if m.Options.RuntimeNamespace == "" {
 		var ns v1.Namespace
 		namespace := m.RuntimeNamespace(ctx.ObjectKey)
+		m.Info("deleting namespace {{namespace}}", "namespace", namespace)
 		err := m.Runtime.Get(ctx, client.ObjectKey{Name: namespace}, &ns)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				return nil
+			if !errors.IsNotFound(err) {
+				return TemporaryProblem(err)
 			}
-			return TemporaryProblem(err)
+			m.Info("namespace {{namespace}} already deleted", "namespace", namespace)
+		} else {
+			if ns.DeletionTimestamp.IsZero() {
+				err := m.Runtime.Delete(ctx, &ns)
+				if err != nil {
+					if !errors.IsNotFound(err) {
+						return TemporaryProblem(err)
+					}
+					m.Info("namespace {{namespace}} already deleted", "namespace", namespace)
+				}
+			} else {
+				m.Info("namespace {{namespace}} still deleting", "namespace", namespace)
+			}
 		}
 		if len(ns.Finalizers) > 0 {
 			return Requeuef("waiting for namespace finalizers to be removed")
 		}
 
 	}
-	ctx.Info("cleanup successful")
+	ctx.Info("cleanup completed")
 	return nil
 }

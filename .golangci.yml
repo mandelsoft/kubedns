@@ -25,7 +25,9 @@ linters:
     revive:
       rules:
         - name: comment-spacings
+          disabled: true
         - name: import-shadowing
+          disabled: true
   exclusions:
     generated: lax
     rules:

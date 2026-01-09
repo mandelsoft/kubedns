@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dns-service-nameserver
+  namespace: dns-system
+
+  labels:
+    target: runtime
+    app: dns-service-nameserver
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "instance"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    dns.gardener.cloud/dnsnames: nameserver.dns-runtime.mandelsoft.shoot.canary.k8s-hana.ondemand.com
+    dns.gardener.cloud/class: garden
+    dns.gardener.cloud/ttl: "60"
+spec:
+  type: LoadBalancer
+  loadBalancerClass: service.k8s.aws/nlb
+
+  # Selects the pods created by the Deployment
+  selector:
+    app: dns-service-nameserver
+
+  ports:
+    - name: dns-udp-port
+      protocol: UDP
+      port: 53          # The port the Service exposes
+      targetPort: 53    # The containerPort defined in the Deployment
