@@ -6,12 +6,11 @@ import (
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cacheindex"
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = ginkgo.Describe("Field Indexer Test Environment", func() {
 	ginkgo.It("field", func() {
-		idx := testutils.Must(cacheindex.FieldIndexer[client.Object]("obj.spec.parentRef"))
+		idx := testutils.Must(cacheindex.FieldIndexer[*corednsv1alpha1.HostedZone]("obj.spec.parentRef"))
 
 		var obj corednsv1alpha1.HostedZone
 

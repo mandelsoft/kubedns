@@ -11,7 +11,7 @@ import (
 type Index[T any] interface {
 	cluster.Index
 
-	GetTyped(ctx context.Context, ns string, name string) ([]T, error)
+	GetTyped(ctx context.Context, ns string, key string) ([]T, error)
 	ForEachTypedItem(ctx context.Context, namespace, key string, action func(object *T) error) error
 }
 
@@ -22,8 +22,8 @@ type _index[T any] struct {
 
 var _ Index[any] = (*_index[any])(nil)
 
-func (i *_index[T]) GetTyped(ctx context.Context, namespace string, name string) ([]T, error) {
-	list, err := i.GetList(ctx, namespace, name)
+func (i *_index[T]) GetTyped(ctx context.Context, namespace string, key string) ([]T, error) {
+	list, err := i.GetList(ctx, namespace, key)
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,7 @@ An environment to manage hosted zones and appropriate authoritative name servers
 ## Description
 
 This project provides a controller-manager managing the deployment of
-[kubednydns](https://github.com/mandelsoft/kubedyndns) DNS servers configured as slave servers to manage DNS entries for a hosted zone. Hosted zones, as well as DNS records in those zones are described by Kubernetes resources `HostedZone` and `CoreDNSEntry`  in namespaces. The DNS server is a [coredns](https://github.com/coredns/coredns) server known from Kubernetes enriched with the *kubedyndns* plugin able to serve DNS records defined by Kubernetes resources.
+[kubedyndns](https://github.com/mandelsoft/kubedyndns) DNS servers configured as slave servers to manage DNS entries for a hosted zone. Hosted zones, as well as DNS records in those zones are described by Kubernetes resources `HostedZone` and `CoreDNSEntry`  in namespaces. The DNS server is a [coredns](https://github.com/coredns/coredns) server known from Kubernetes enriched with the *kubedyndns* plugin able to serve DNS records defined by Kubernetes resources.
 
 For every root zone such a dns server is deployed acting as *Authoritative Name Server* for this zone and locally configured nested zones.
 

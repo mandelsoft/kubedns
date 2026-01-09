@@ -63,7 +63,6 @@ type HostedZoneReconciler struct {
 	Runtime cluster.Cluster
 
 	runtimeOwner owner.OwnerHandler
-	dns          DNSHandler
 	recorder     record.EventRecorder
 
 	index index.UntypedIndex
@@ -168,7 +167,7 @@ func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.L
 		if slices.Contains(hist, obj.Spec.ParentRef) {
 			return nil, true, Failedf("reference cyle %s", path)
 		}
-		err := r.DataPlane.Get(ctx, client.ObjectKey{obj.GetNamespace(), obj.Spec.ParentRef}, &parent)
+		err := r.DataPlane.Get(ctx, client.ObjectKey{Namespace: obj.GetNamespace(), Name: obj.Spec.ParentRef}, &parent)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil, true, Failedf("parent %s not found", obj.Spec.ParentRef)

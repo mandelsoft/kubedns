@@ -24,7 +24,7 @@ type problem struct {
 	err     error
 }
 
-// Requeue requests a ratelimited back off without reporting a reconcilation error
+// Requeue requests a ratelimited back off without reporting a reconciliation error
 // iff there is an error given.
 func Requeue(err error) Problem {
 	if err == nil {
@@ -51,7 +51,7 @@ func Failedf(msg string, args ...any) Problem {
 
 // TemporaryProblem reports a temporary error requiring a requeue and error reporting
 // iff there is an error given.
-// It describes a reconcilation error which probably disappears after repeating
+// It describes a reconciliation error which probably disappears after repeating
 // the request.
 func TemporaryProblem(err error) Problem {
 	if err == nil {
@@ -91,9 +91,9 @@ func (p problem) Error() error {
 func (p problem) String() string {
 	if p.err != nil {
 		if p.problem != nil {
-			return fmt.Sprintf("reconcilation error: %s; auto healing problem: %s", p.err.Error(), p.problem.Error())
+			return fmt.Sprintf("reconciliation error: %s; auto healing problem: %s", p.err.Error(), p.problem.Error())
 		}
-		return "reconcilation error: " + p.err.Error()
+		return "reconciliation error: " + p.err.Error()
 	}
 
 	if p.problem != nil {
@@ -103,7 +103,7 @@ func (p problem) String() string {
 			return "triggerable problem: " + p.problem.Error()
 		}
 	}
-	return "no reconcilation problem"
+	return "no reconciliation problem"
 }
 
 func (p problem) Message() string {
@@ -155,20 +155,20 @@ type InfoLogger interface {
 }
 
 // cases:
-//  - reconcilation successful and completed
-//  - reconcilation successful but incomplete (for example waiting for
+//  - reconciliation successful and completed
+//  - reconciliation successful but incomplete (for example waiting for
 //    secondary/external resources to read an expected state)
-//  - reconcilation temporarily failed (for example due to API issues)
-//  - reconcilation permanently failed (resource configuratiuon issue)
+//  - reconciliation temporarily failed (for example due to API issues)
+//  - reconciliation permanently failed (resource configuratiuon issue)
 
 func Result(log InfoLogger, p Problem, after ...time.Duration) (ctrl.Result, error) {
 	if p == nil {
-		log.Info("*** reconcilation completed")
+		log.Info("*** reconciliation completed")
 		return ctrl.Result{RequeueAfter: general.Optional(after...)}, nil
 	}
 	if p.Error() != nil {
 		if p.Requeue() {
-			log.Info("*** temporary reconcilation problem: {{error}}", "error", p.String())
+			log.Info("*** temporary reconciliation problem: {{error}}", "error", p.String())
 			return ctrl.Result{}, p.Error()
 		} else {
 			if p.Problem() == nil {
@@ -183,7 +183,7 @@ func Result(log InfoLogger, p Problem, after ...time.Duration) (ctrl.Result, err
 		RequeueAfter: general.Optional(after...),
 	}
 
-	log.Info("*** reconcilation incomplete: {{error}}", "error", p.String())
+	log.Info("*** reconciliation incomplete: {{error}}", "error", p.String())
 	var err error
 	if p.Requeue() {
 		// Requeue does not reliably work if watch close appears,

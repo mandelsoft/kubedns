@@ -11,11 +11,11 @@ import (
 const R1 = "relation1"
 const R2 = "relation2"
 
-var A = client.ObjectKey{"default", "A"}
-var B = client.ObjectKey{"default", "B"}
-var C = client.ObjectKey{"default", "C"}
-var D = client.ObjectKey{"default", "D"}
-var E = client.ObjectKey{"default", "E"}
+var A = client.ObjectKey{Namespace: "default", Name: "A"}
+var B = client.ObjectKey{Namespace: "default", Name: "B"}
+var C = client.ObjectKey{Namespace: "default", Name: "C"}
+var D = client.ObjectKey{Namespace: "default", Name: "D"}
+var E = client.ObjectKey{Namespace: "default", Name: "E"}
 
 var _ = Describe("Untyped Index Test Environment", func() {
 	var idx index.UntypedIndex

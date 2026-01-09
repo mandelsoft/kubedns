@@ -69,8 +69,6 @@ func (c *_controller[T, P]) GetRecoder() record.EventRecorder {
 
 func (c *_controller[T, P]) GetTypedIndex(name string) cacheindex.Index[T] {
 	i := c.indices[name]
-	if i == nil {
-	}
 	return i
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/objutils"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,21 +25,21 @@ func (m *RuntimeMode) RuntimeNamespace(key client.ObjectKey) string {
 	if m.Options.RuntimeNamespace != "" {
 		return m.Options.RuntimeNamespace
 	}
-	return fmt.Sprintf("%s-%s", BASE, key.Namespace)
+	return objutils.GenerateUniqueName(BASE, "", key.Namespace, objutils.MAX_NAMESPACELEN)
 }
 
 func (m *RuntimeMode) RuntimeSecretName(key client.ObjectKey) string {
 	if m.Options.RuntimeNamespace != "" {
-		return fmt.Sprintf("%s-%s", BASE, key.Namespace)
+		return objutils.GenerateUniqueName(BASE, "", key.Namespace, objutils.MAX_NAMESPACELEN)
 	}
 	return fmt.Sprintf("%s", BASE)
 }
 
 func (m *RuntimeMode) RuntimeDeploymentName(key client.ObjectKey) string {
 	if m.Options.RuntimeNamespace != "" {
-		return fmt.Sprintf("%s-%s-%s", BASE, key.Namespace, key.Name)
+		return objutils.GenerateUniqueName(BASE, key.Namespace, key.Name, objutils.MAX_NAMELEN)
 	}
-	return fmt.Sprintf("%s-%s", BASE, key.Name)
+	return objutils.GenerateUniqueName(BASE, "", key.Name, objutils.MAX_NAMELEN)
 }
 
 func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting bool) (map[string]interface{}, error) {

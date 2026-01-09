@@ -118,7 +118,7 @@ func (r *ReconcileRequest) Reconcile() Problem {
 			if err := r.reconciler.DataPlane.Patch(r, obj, patch); err != nil {
 				return TemporaryProblem(client.IgnoreNotFound(err))
 			}
-			r.Info("taking responsibilty")
+			r.Info("taking responsibility")
 		}
 	}
 
@@ -196,7 +196,7 @@ func (r *ReconcileRequest) IsResponsibile() (bool, *Responsibility, Problem) {
 		return new, info, nil
 	}
 
-	match := info.Root.Status.Observed.Class == r.reconciler.Options.Class && info.Root.Status.Observed.Class == r.reconciler.Options.Class
+	match := info.Root.Status.Observed.Class == r.reconciler.Options.Class && info.Root.Status.Observed.Runtime == r.reconciler.Options.Runtime
 	r.Info("checking registered match", "root", info.Root.Name, "match", new, "runtime", info.Root.Status.Observed.Runtime, "class", info.Root.Status.Observed.Class)
 	return match, info, nil
 

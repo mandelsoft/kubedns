@@ -44,7 +44,7 @@ func (d *dnsKubedns) Manifests(ctx *DNSContext, values map[string]interface{}) (
 	if !ctx.Delete {
 		ips, cnames = isLoadBalancerReady(ctx.Service)
 		if len(cnames) == 0 && len(ips) == 0 {
-			// service change trigger reconcilation -> no backoff
+			// service change trigger reconciliation -> no backoff
 			return nil, nil, reconcile.WatchBackedProblemf("load balancer not yet available")
 		}
 	}
