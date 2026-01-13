@@ -99,7 +99,7 @@ func (d *dnsKubedns) GetCNames(ctx *DNSContext) ([]string, reconcile.Problem) {
 	}
 
 	var entry corednsv1alpha1.CoreDNSEntry
-	err := ctx.reconciler.DataPlane.Get(ctx, client.ObjectKey{Namespace: "dns-system", Name: d.getEntryName(ctx)}, &entry)
+	err := ctx.Reconciler.DataPlane.Get(ctx, client.ObjectKey{Namespace: "dns-system", Name: d.getEntryName(ctx)}, &entry)
 	if err != nil {
 		return nil, reconcile.TemporaryProblem(err)
 	}
@@ -119,10 +119,12 @@ func (d *dnsKubedns) GetCNames(ctx *DNSContext) ([]string, reconcile.Problem) {
 }
 
 func (d *dnsKubedns) getCNames(ctx *DNSContext) ([]string, error) {
-	n := fmt.Sprintf("%s.%s.%s", ctx.Name, ctx.Namespace, d.domain)
+	key := ctx.GetKey()
+	n := fmt.Sprintf("%s.%s.%s", key.Name, key.Namespace, d.domain)
 	return []string{n}, nil
 }
 
 func (d *dnsKubedns) getEntryName(ctx *DNSContext) string {
-	return ctx.Namespace + "-" + ctx.Name
+	key := ctx.GetKey()
+	return key.Namespace + "-" + key.Name
 }

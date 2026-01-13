@@ -45,15 +45,15 @@ func (m *RuntimeMode) RuntimeDeploymentName(key client.ObjectKey) string {
 func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting bool) (map[string]interface{}, error) {
 	var secret v1.Secret
 
-	if ctx.Simulate {
+	if ctx.IsSimulate() {
 		secret.Data = map[string][]byte{
 			"token":  []byte(base64.StdEncoding.EncodeToString([]byte("access-token"))),
 			"ca.crt": []byte(base64.StdEncoding.EncodeToString([]byte("server-ca-cert"))),
 		}
 	} else {
-		key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
-		if !ctx.Simulate {
-			m.index.Add(INDEX_SASECFRET, ctx.ObjectKey, key)
+		key := client.ObjectKey{Namespace: ctx.GetKey().Namespace, Name: name}
+		if !ctx.IsSimulate() {
+			m.index.Add(INDEX_SASECFRET, ctx.GetKey(), key)
 		}
 		err := m.DataPlane.Get(ctx, key, &secret)
 		if err != nil {
@@ -64,7 +64,7 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting b
 				} else {
 					ctx.Info("creating serviceaccount secret {{secret}}", "secret", key)
 					secret.Name = name
-					secret.Namespace = ctx.Namespace
+					secret.Namespace = ctx.GetKey().Namespace
 					secret.Type = v1.SecretTypeServiceAccountToken
 					// secret.Finalizers = []string{m.Finalizer}
 					// don't use finalizers. SA secrets are instantly deleted after creation if there
@@ -103,7 +103,7 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting b
 func (m *RuntimeMode) Prepare(ctx ReconcileContext) Problem {
 	// assure target namespace
 	var ns v1.Namespace
-	namespace := m.RuntimeNamespace(ctx.ObjectKey)
+	namespace := m.RuntimeNamespace(ctx.GetKey())
 	err := m.Runtime.Get(ctx, client.ObjectKey{Name: namespace}, &ns)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -120,7 +120,7 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) Problem {
 		return prob
 	}
 
-	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
+	key := client.ObjectKey{Namespace: ctx.GetKey().Namespace, Name: name}
 	found := len(m.index.UsersFor(INDEX_SASECFRET, key))
 	if found != 0 {
 		m.Info("found still {{amount}} zones", "amount", found)
@@ -151,7 +151,7 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) Problem {
 
 	if m.Options.RuntimeNamespace == "" {
 		var ns v1.Namespace
-		namespace := m.RuntimeNamespace(ctx.ObjectKey)
+		namespace := m.RuntimeNamespace(ctx.GetKey())
 		m.Info("deleting namespace {{namespace}}", "namespace", namespace)
 		err := m.Runtime.Get(ctx, client.ObjectKey{Name: namespace}, &ns)
 		if err != nil {

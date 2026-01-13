@@ -30,11 +30,11 @@ func (r *ReconcileRequest) transferConditions(src client.ObjectKey, from []metav
 			})
 		}
 	}
-	for _, c := range r.instance.Status.Conditions {
+	for _, c := range r.Object.Status.Conditions {
 		if _myConditions.Has(c.Type) {
 			if meta.FindStatusCondition(from, c.Type) == nil {
 				r.Info("  removing condition {{condition}}", "condition", c.Type)
-				meta.RemoveStatusCondition(&r.instance.Status.Conditions, c.Type)
+				meta.RemoveStatusCondition(&r.Object.Status.Conditions, c.Type)
 			}
 		}
 	}
@@ -44,19 +44,19 @@ func (r *ReconcileRequest) transferConditions(src client.ObjectKey, from []metav
 func (r *ReconcileRequest) summary() {
 	status := "Failed"
 	msg := "status unknown"
-	c := meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.ValidationConditionType)
+	c := meta.FindStatusCondition(r.Object.Status.Conditions, corednsv1alpha1.ValidationConditionType)
 	if c != nil {
 		msg = c.Message
 		if c.Status == metav1.ConditionTrue {
-			c = meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.RuntimeConditionType)
+			c = meta.FindStatusCondition(r.Object.Status.Conditions, corednsv1alpha1.RuntimeConditionType)
 			if c != nil {
 				msg = c.Message
 				if c.Status == metav1.ConditionTrue {
-					c = meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.NameserverConditionType)
+					c = meta.FindStatusCondition(r.Object.Status.Conditions, corednsv1alpha1.NameserverConditionType)
 					if c != nil {
 						msg = c.Message
 						if c.Status == metav1.ConditionTrue {
-							c = meta.FindStatusCondition(r.instance.Status.Conditions, corednsv1alpha1.ServerConditionType)
+							c = meta.FindStatusCondition(r.Object.Status.Conditions, corednsv1alpha1.ServerConditionType)
 							if c != nil {
 								msg = c.Message
 								if c.Status == metav1.ConditionTrue {
@@ -76,6 +76,6 @@ func (r *ReconcileRequest) summary() {
 		}
 	}
 	r.Info("summaried status", "status", status, "message", msg)
-	r.instance.Status.Message = msg
-	r.instance.Status.State = status
+	r.Object.Status.Message = msg
+	r.Object.Status.State = status
 }

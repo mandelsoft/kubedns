@@ -1,7 +1,6 @@
 package entry
 
 import (
-	"context"
 	errors2 "errors"
 	"fmt"
 	"net"
@@ -10,32 +9,20 @@ import (
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconciler"
 	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/objutils"
-	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ReconcilationRequest struct {
-	common.ReconcilationRequest[*corednsv1alpha1.CoreDNSEntry, *CoreDNSEntryReconciler]
+type ReconcileRequest struct {
+	reconciler.DefaultReconcileRequest[*corednsv1alpha1.CoreDNSEntry, *CoreDNSEntryReconciler]
 }
 
-func NewRequest(ctx context.Context, r *CoreDNSEntryReconciler, log logging.Logger, obj *corednsv1alpha1.CoreDNSEntry) *ReconcilationRequest {
-	var req ReconcilationRequest
-
-	req.Context = ctx
-	req.Logger = log
-	req.ObjectKey = client.ObjectKeyFromObject(obj) // no deletion handling
-	req.Instance = obj
-	req.Reconciler = r
-	return &req
-}
-
-func (r *ReconcilationRequest) handleObject() reconcile.Problem {
+func (r *ReconcileRequest) Reconcile() reconcile.Problem {
 	baseerr := r.Validate()
-	e := r.Instance
+	e := r.Object
 
 	var root *corednsv1alpha1.HostedZone
 	var zone *corednsv1alpha1.HostedZone
@@ -67,16 +54,15 @@ func (r *ReconcilationRequest) handleObject() reconcile.Problem {
 			return nil
 		}
 	}
-	mod := false
 	if baseerr != nil {
-		mod = r.SetStatusCondition(metav1.Condition{
+		r.SetStatusCondition(metav1.Condition{
 			Type:    corednsv1alpha1.ValidationConditionType,
 			Status:  metav1.ConditionFalse,
 			Reason:  corednsv1alpha1.ReasonConfigurarationInvalid,
 			Message: baseerr.Error(),
 		})
 	} else {
-		mod = r.SetStatusCondition(metav1.Condition{
+		r.SetStatusCondition(metav1.Condition{
 			Type:    corednsv1alpha1.ValidationConditionType,
 			Status:  metav1.ConditionTrue,
 			Reason:  corednsv1alpha1.ReasonConfigurarationValid,
@@ -113,29 +99,22 @@ func (r *ReconcilationRequest) handleObject() reconcile.Problem {
 			}
 		}
 	}
-	if e.Status.Message != msg {
-		e.Status.Message = msg
-		mod = true
-	}
-	if e.Status.State != state {
-		e.Status.State = state
-		mod = true
-	}
-
-	var err error
-	if mod {
-		r.Info("update status to {{state}}", "state", e.Status.State, "message", e.Status.Message)
-		err = r.Reconciler.DataPlane.Status().Update(r, e)
-	}
-	return reconcile.TemporaryProblem(err)
+	e.Status.Message = msg
+	e.Status.State = state
+	return nil
 }
 
-func (r *ReconcilationRequest) responsibleForEntry() (*Responsibility, reconcile.Problem) {
+func (r *ReconcileRequest) UpdateStatus() reconcile.Problem {
+	r.Info("update status '{{state}}' '{{message}}'", "state", r.Object.Status.State, "message", r.Object.Status.Message)
+	return r.UpdateStatus()
+}
+
+func (r *ReconcileRequest) responsibleForEntry() (*Responsibility, reconcile.Problem) {
 	var resp Responsibility
 
 	hist := []string{}
 	path := ""
-	n := objutils.RefObjectKeyFor(r.Instance, r.Instance.Spec.ZoneRef)
+	n := objutils.RefObjectKeyFor(r.Object, r.Object.Spec.ZoneRef)
 	for {
 		var zone corednsv1alpha1.HostedZone
 		path = path + "/" + n.Name
@@ -165,10 +144,10 @@ func (r *ReconcilationRequest) responsibleForEntry() (*Responsibility, reconcile
 	}
 }
 
-func (r *ReconcilationRequest) Validate() error {
+func (r *ReconcileRequest) Validate() error {
 	var err error
 
-	e := r.Instance
+	e := r.Object
 	if len(e.Spec.DNSNames) == 0 {
 		err = fmt.Errorf("no DNS names specified")
 	}
@@ -217,11 +196,11 @@ func (r *ReconcilationRequest) Validate() error {
 	return err
 }
 
-func (r *ReconcilationRequest) SetStatusCondition(condition metav1.Condition) bool {
+func (r *ReconcileRequest) SetStatusCondition(condition metav1.Condition) bool {
 	if condition.ObservedGeneration == 0 {
-		condition.ObservedGeneration = r.Instance.GetGeneration()
+		condition.ObservedGeneration = r.Object.GetGeneration()
 	}
-	return meta.SetStatusCondition(&r.Instance.Status.Conditions, condition)
+	return meta.SetStatusCondition(&r.Object.Status.Conditions, condition)
 }
 
 /////////////////////////////////////////////////////////////////////////////

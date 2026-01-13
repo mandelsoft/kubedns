@@ -30,9 +30,9 @@ func (m *LocalMode) RuntimeDeploymentName(key client.ObjectKey) string {
 }
 
 func (m *LocalMode) AccessValues(ctx ReconcileContext, name string, deleting bool) (map[string]interface{}, error) {
-	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
-	if !ctx.Simulate {
-		m.index.Remove(INDEX_SASECFRET, ctx.ObjectKey, key)
+	secretkey := client.ObjectKey{Namespace: ctx.GetKey().Namespace, Name: name}
+	if !ctx.IsSimulate() {
+		m.index.Remove(INDEX_SASECFRET, ctx.GetKey(), secretkey)
 	}
 	return nil, nil
 }

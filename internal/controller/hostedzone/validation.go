@@ -61,24 +61,24 @@ func IsASCIIAlnumString(s string) bool {
 }
 
 func (r *ReconcileRequest) Validate(root *Responsibility) (string, error) {
-	if len(r.instance.Spec.DomainNames) == 0 {
+	if len(r.Object.Spec.DomainNames) == 0 {
 		return v1alpha1.ReasonDomainNameMissing, fmt.Errorf("at one domain name required")
 	}
-	if r.instance.Spec.EMail == "" {
+	if r.Object.Spec.EMail == "" {
 		return v1alpha1.ReasonEMailMissing, fmt.Errorf("email address required")
 	}
-	if r.instance.Spec.Expire == 0 {
+	if r.Object.Spec.Expire == 0 {
 		return v1alpha1.ReasonExpireMissing, fmt.Errorf("expire required")
 	}
-	if r.instance.Spec.Refresh == 0 || r.instance.Spec.Retry == 0 || r.instance.Spec.MinimumTTL == 0 {
+	if r.Object.Spec.Refresh == 0 || r.Object.Spec.Retry == 0 || r.Object.Spec.MinimumTTL == 0 {
 		return v1alpha1.ReasonTTLMissing, fmt.Errorf("refresh, retry or minimumTTL required")
 	}
 
-	if r.instance.Spec.ParentRef != "" {
-		if r.instance.Spec.Runtime != nil {
+	if r.Object.Spec.ParentRef != "" {
+		if r.Object.Spec.Runtime != nil {
 			return v1alpha1.ReasonInvalidNesting, fmt.Errorf("runtime set for nested zone")
 		}
-		if r.instance.Spec.Class != nil {
+		if r.Object.Spec.Class != nil {
 			return v1alpha1.ReasonInvalidNesting, fmt.Errorf("class set for nested zone")
 		}
 	}

@@ -71,7 +71,8 @@ func (d *dnsGardener) GetCNames(ctx *DNSContext) ([]string, reconcile.Problem) {
 }
 
 func (d *dnsGardener) getCNames(ctx *DNSContext) ([]string, error) {
-	n := fmt.Sprintf("%s.%s.%s", ctx.Name, ctx.Namespace, d.domain)
+	key := ctx.GetKey()
+	n := fmt.Sprintf("%s.%s.%s", key.Name, key.Namespace, d.domain)
 	return []string{n}, nil
 }
 

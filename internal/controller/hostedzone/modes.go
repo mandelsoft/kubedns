@@ -23,9 +23,9 @@ type ModeImpl struct {
 }
 
 func (m *ModeImpl) Cleanup(ctx ReconcileContext, name string) reconcile.Problem {
-	key := client.ObjectKey{Namespace: ctx.Namespace, Name: name}
-	if !ctx.Simulate {
-		m.index.Remove(INDEX_SASECFRET, ctx.ObjectKey, key)
+	secretkey := client.ObjectKey{Namespace: ctx.GetKey().Namespace, Name: name}
+	if !ctx.IsSimulate() {
+		m.index.Remove(INDEX_SASECFRET, ctx.GetKey(), secretkey)
 	}
 	return nil
 }

@@ -1,20 +1,11 @@
 package common
 
 import (
-	"context"
-
-	"github.com/mandelsoft/logging"
+	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconciler"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ReconcilationContext struct {
-	context.Context
-	logging.Logger
-	client.ObjectKey
-}
-
-type ReconcilationRequest[T, R any] struct {
-	ReconcilationContext
-	Instance   T
+type ReconcilationRequest[T client.Object, R any] struct {
+	reconciler.BaseRequest[T]
 	Reconciler R
 }

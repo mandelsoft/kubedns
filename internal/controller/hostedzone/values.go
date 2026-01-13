@@ -10,7 +10,19 @@ import (
 
 const BASE = "dns-service"
 
-type ReconcileContext struct {
+type ReconcileContext interface {
+	context.Context
+	logging.Logger
+
+	IsSimulate() bool
+	GetPlatform() string
+	GetDataPlaneURL() string
+	GetKey() client.ObjectKey
+
+	Values(m Mode, deleting bool) (map[string]interface{}, error)
+}
+
+type reconcileContext struct {
 	logging.Logger
 	context.Context
 	client.ObjectKey
@@ -20,13 +32,34 @@ type ReconcileContext struct {
 	Simulate bool
 }
 
-func NewReconcileContext(ctx context.Context, log logging.Logger, server string, platform string, key client.ObjectKey) ReconcileContext {
-	return ReconcileContext{Logger: log, Context: ctx, ObjectKey: key, DataPlaneURL: server, Platform: platform}
+func NewReconcileContext(ctx context.Context, log logging.Logger, server string, platform string, key client.ObjectKey) reconcileContext {
+	return reconcileContext{Logger: log, Context: ctx, ObjectKey: key, DataPlaneURL: server, Platform: platform}
 }
 
-func (r *ReconcileContext) Values(m Mode, deleting bool) (map[string]interface{}, error) {
+func (c reconcileContext) IsSimulate() bool {
+	return c.Simulate
+}
+
+func (c reconcileContext) GetPlatform() string {
+	return c.Platform
+}
+
+func (c reconcileContext) GetDataPlaneURL() string {
+	return c.DataPlaneURL
+}
+
+func (c reconcileContext) GetKey() client.ObjectKey {
+	return c.ObjectKey
+}
+
+func (c reconcileContext) Values(m Mode, deleting bool) (map[string]interface{}, error) {
+	return Values(c, m, deleting)
+}
+
+func Values(c ReconcileContext, m Mode, deleting bool) (map[string]interface{}, error) {
+	key := c.GetKey()
 	accname := fmt.Sprintf("%s", BASE)
-	depname := m.RuntimeDeploymentName(r.ObjectKey)
+	depname := m.RuntimeDeploymentName(key)
 
 	access := map[string]interface{}{
 		"token":  "",
@@ -35,28 +68,25 @@ func (r *ReconcileContext) Values(m Mode, deleting bool) (map[string]interface{}
 
 	values := map[string]interface{}{
 		"dataplane": map[string]interface{}{
-			"namespace": r.Namespace,
-			"server":    r.DataPlaneURL,
+			"namespace": key.Namespace,
+			"server":    c.GetDataPlaneURL(),
 			"name":      accname,
 			"label":     accname,
 			"access":    access,
-			"zone":      r.Name,
+			"zone":      key.Name,
 		},
 		"runtime": map[string]interface{}{
-			"platform":  r.Platform,
-			"namespace": m.RuntimeNamespace(r.ObjectKey),
+			"platform":  c.GetPlatform(),
+			"namespace": m.RuntimeNamespace(key),
 			"secret": map[string]interface{}{
-				"name": m.RuntimeSecretName(r.ObjectKey),
+				"name": m.RuntimeSecretName(key),
 			},
 			"name":     depname,
 			"label":    depname,
 			"replicas": 1,
 		},
 	}
-	tmp, repeat := m.AccessValues(*r, accname, deleting)
-	if repeat != nil {
-		r.Logger.Info("no access info -> must repeat")
-	}
+	tmp, repeat := m.AccessValues(c, accname, deleting)
 	mergeValues(access, tmp)
 	return values, repeat
 }
