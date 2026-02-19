@@ -1,7 +1,7 @@
 package common
 
 import (
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconciler"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

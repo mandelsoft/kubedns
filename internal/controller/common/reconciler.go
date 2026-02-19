@@ -2,13 +2,11 @@ package common
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/mandelsoft/kubecrtutils/cacheindex"
+	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/controller"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cacheindex"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
-	controller2 "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
 )
 
@@ -21,29 +19,28 @@ const IndexKeyEntryZone = "corednsentry.zone"
 type Reconciler struct {
 	logging.Logger
 	FieldManager string
-	DataPlane    cluster.Cluster
 
-	ParentIndex cacheindex.Index[corednsv1alpha1.HostedZone]
-	EntryIndex  cacheindex.Index[corednsv1alpha1.CoreDNSEntry]
+	XXX         cluster.ClusterEquivalent
+	ParentIndex cacheindex.TypedIndex[corednsv1alpha1.HostedZone]
+	EntryIndex  cacheindex.TypedIndex[corednsv1alpha1.CoreDNSEntry]
 }
 
-func NewReconciler(controller types.Controller) (*Reconciler, error) {
-	i := controller.GetControllerManager().GetIndices()
+func NewReconciler(c controller.Controller) (*Reconciler, error) {
+	pidx, err := cacheindex.GetIndexFrom[corednsv1alpha1.HostedZone](c, IndexKeyZoneParent)
+	if err != nil {
+		return nil, err
+	}
+	eidx, err := cacheindex.GetIndexFrom[corednsv1alpha1.CoreDNSEntry](c, IndexKeyEntryZone)
+	if err != nil {
+		return nil, err
+	}
 
-	pidx := i.Get(controller2.GlobalControllerIndexName(ControllerHostedzone, IndexKeyZoneParent))
-	if pidx == nil {
-		return nil, fmt.Errorf("parent index not found")
-	}
-	eidx := i.Get(controller2.GlobalControllerIndexName(ControllerEntry, IndexKeyEntryZone))
-	if eidx == nil {
-		return nil, fmt.Errorf("entry index not found")
-	}
 	return &Reconciler{
-		Logger:       controller.GetLogger(),
-		FieldManager: controller.GetFieldManager(),
-		DataPlane:    controller.GetCluster(),
-		ParentIndex:  pidx.(cacheindex.Index[corednsv1alpha1.HostedZone]),
-		EntryIndex:   eidx.(cacheindex.Index[corednsv1alpha1.CoreDNSEntry]),
+		Logger:       c.GetLogger(),
+		FieldManager: c.GetFieldManager(),
+		XXX:          c.GetCluster(),
+		ParentIndex:  pidx,
+		EntryIndex:   eidx,
 	}, nil
 }
 

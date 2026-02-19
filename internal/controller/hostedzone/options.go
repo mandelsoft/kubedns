@@ -7,10 +7,10 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/errors"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/manageropts"
+	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/options/manageropts"
 	"github.com/spf13/pflag"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 type Options struct {
@@ -71,7 +71,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&o.Platform, "iaas", "", "default", "IaaS layer to use (special support so far for \"aws\"")
 }
 
-func (o *Options) Configure(ctx context.Context, cfg *ctrl.Options, opts flagutils.OptionSet) error {
+func (o *Options) Configure(ctx context.Context, cfg *manager.Options, opts flagutils.OptionSet) error {
 	if o.Runtime != "" {
 		cfg.LeaderElectionID = o.Runtime + "-" + cfg.LeaderElectionID
 	}

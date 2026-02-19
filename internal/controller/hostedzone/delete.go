@@ -1,8 +1,8 @@
 package hostedzone
 
 import (
+	. "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubedns/pkg/render"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

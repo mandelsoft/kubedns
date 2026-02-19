@@ -19,12 +19,11 @@ package hostedzone
 import (
 	"context"
 
+	"github.com/mandelsoft/kubecrtutils/controller"
+	reconcile2 "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
+	"github.com/mandelsoft/kubecrtutils/types"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller"
-	reconcile2 "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/types"
-	"github.com/mandelsoft/logging"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -36,13 +35,13 @@ import (
 const INDEX_SASECFRET = "serviceaccount-secret"
 
 func Controller() controller.Definition {
-	return controller.Define[corednsv1alpha1.HostedZone](common.ControllerHostedzone, "dataplane", &ReconcilerFactory{}).
+	return controller.Define[*corednsv1alpha1.HostedZone](common.ControllerHostedzone, "dataplane", &ReconcilerFactory{}).
 		UseCluster("runtime").
 		AddIndex(common.IndexKeyZoneParent, parentIndexer).
 		AddTrigger(
-			controller.OwnerTrigger[appsv1.Deployment]().OnCluster("runtime"),
-			controller.OwnerTrigger[corev1.Secret]().OnCluster("runtime"),
-			controller.ResourceTriggerByFactory[corev1.Secret](secretTriggerFactory),
+			controller.OwnerTrigger[*appsv1.Deployment]().OnCluster("runtime"),
+			controller.OwnerTrigger[*corev1.Secret]().OnCluster("runtime"),
+			controller.LocalResourceTriggerByFactory[*corev1.Secret](secretTriggerFactory),
 		)
 }
 
@@ -53,9 +52,9 @@ func parentIndexer(o *corednsv1alpha1.HostedZone) []string {
 	return []string{o.Spec.ParentRef}
 }
 
-func secretTriggerFactory(c types.Controller, target types.Cluster, proto client.Object, log logging.Logger) (handler.TypedMapFunc[*corev1.Secret, reconcile.Request], error) {
-	r := c.GetReconciler().(reconcile2.CRTReconciler).GetEffective().(*HostedZoneReconciler)
-
+func secretTriggerFactory(ctx context.Context, cntr types.Controller) handler.TypedMapFunc[*corev1.Secret, reconcile.Request] {
+	r := cntr.GetReconciler().(reconcile2.CRTReconciler).GetEffective().(*HostedZoneReconciler)
+	log := cntr.GetLogger()
 	return func(ctx context.Context, obj *corev1.Secret) []reconcile.Request {
 		var trigger []reconcile.Request
 		key := client.ObjectKeyFromObject(obj)
@@ -77,5 +76,5 @@ func secretTriggerFactory(c types.Controller, target types.Cluster, proto client
 			)
 		}
 		return trigger
-	}, nil
+	}
 }

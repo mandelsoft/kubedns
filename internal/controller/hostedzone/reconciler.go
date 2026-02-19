@@ -20,13 +20,13 @@ import (
 	"context"
 	"slices"
 
+	"github.com/mandelsoft/kubecrtutils/cluster"
+	. "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
+	"github.com/mandelsoft/kubecrtutils/index"
+	"github.com/mandelsoft/kubecrtutils/objutils/objfilter"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
-	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/index"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/owner"
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,16 +36,14 @@ import (
 // HostedZoneReconciler reconciles a HostedZone object
 type HostedZoneReconciler struct {
 	*common.Reconciler
-	Mode         Mode
-	Finalizer    string
-	DataPlaneURL string
+	Mode      Mode
+	Finalizer string
 
 	Manifests map[string][]byte
 
-	Options *Options
-	Runtime cluster.Cluster
-
-	runtimeOwner owner.OwnerHandler
+	Options     *Options
+	Runtime     cluster.Cluster
+	ownerFilter objfilter.Interface
 
 	index index.UntypedIndex
 }
@@ -60,7 +58,7 @@ func (r *HostedZoneReconciler) Request(def *reconciler.BaseRequest[*corednsv1alp
 }
 
 func (r *HostedZoneReconciler) IsSeparateRuntime() bool {
-	return r.Options.RuntimeNamespace != "" || !r.DataPlane.IsSameAs(r.Runtime)
+	return r.Options.RuntimeNamespace != "" || !r.XXX.IsSameAs(r.Runtime)
 }
 
 func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger logging.Logger, obj client.ObjectKey) error {
@@ -71,7 +69,7 @@ func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger loggi
 	}
 	for _, c := range children {
 		logger.Info("triggering child", "name", c.Name, "namespace", c.Namespace)
-		r.DataPlane.EnqueueByObject(&c)
+		r.XXX.EnqueueByObject(ctx, &c)
 	}
 	return nil
 }
@@ -83,12 +81,12 @@ func (r *HostedZoneReconciler) TriggerEntries(ctx context.Context, logger loggin
 	}
 	logger.Info("notify {{amount}} children about changes", "amount", len(entries))
 	for _, c := range entries {
-		r.DataPlane.EnqueueByObject(&c)
+		r.XXX.EnqueueByObject(ctx, &c)
 	}
 	return nil
 }
 
-func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.Logger, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, Problem) {
+func (r *HostedZoneReconciler) GetRootInfo(ctx ReconcileRequest, logger logging.Logger, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, Problem) {
 	var path string
 	var directParent *corednsv1alpha1.HostedZone
 
@@ -100,7 +98,7 @@ func (r *HostedZoneReconciler) GetRootInfo(ctx context.Context, logger logging.L
 		if slices.Contains(hist, obj.Spec.ParentRef) {
 			return nil, true, Failedf("reference cyle %s", path)
 		}
-		err := r.DataPlane.Get(ctx, client.ObjectKey{Namespace: obj.GetNamespace(), Name: obj.Spec.ParentRef}, &parent)
+		err := ctx.Get(ctx, client.ObjectKey{Namespace: obj.GetNamespace(), Name: obj.Spec.ParentRef}, &parent)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil, true, Failedf("parent %s not found", obj.Spec.ParentRef)

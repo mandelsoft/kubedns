@@ -3,7 +3,7 @@ package hostedzone
 import (
 	"context"
 
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 )
 
 func init() {

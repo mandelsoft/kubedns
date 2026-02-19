@@ -3,7 +3,8 @@ package hostedzone
 import (
 	"fmt"
 
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -17,15 +18,15 @@ func NewLocalMode(r *HostedZoneReconciler) Mode {
 	return &LocalMode{ModeImpl{r}}
 }
 
-func (m *LocalMode) RuntimeNamespace(key client.ObjectKey) string {
+func (m *LocalMode) RuntimeNamespace(c cluster.Cluster, key client.ObjectKey) string {
 	return key.Namespace
 }
 
-func (m *LocalMode) RuntimeSecretName(client.ObjectKey) string {
+func (m *LocalMode) RuntimeSecretName(cluster.Cluster, client.ObjectKey) string {
 	return ""
 }
 
-func (m *LocalMode) RuntimeDeploymentName(key client.ObjectKey) string {
+func (m *LocalMode) RuntimeDeploymentName(c cluster.Cluster, key client.ObjectKey) string {
 	return fmt.Sprintf("%s-%s", BASE, key.Name)
 }
 

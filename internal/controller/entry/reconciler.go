@@ -19,12 +19,12 @@ package entry
 import (
 	"context"
 
+	"github.com/mandelsoft/kubecrtutils/controller"
+	"github.com/mandelsoft/kubecrtutils/controller/builder"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconciler"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	crtreconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -46,7 +46,7 @@ func (r *CoreDNSEntryReconciler) Request(def *reconciler.BaseRequest[*corednsv1a
 	}
 }
 
-func CreateReconciler(ctx context.Context, controller controller.Controller[corednsv1alpha1.CoreDNSEntry, *corednsv1alpha1.CoreDNSEntry], b *builder.Builder) (crtreconcile.Reconciler, error) {
+func CreateReconciler(ctx context.Context, controller controller.TypedController[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry], b builder.Builder) (crtreconcile.Reconciler, error) {
 	base, err := common.NewReconciler(controller)
 	if err != nil {
 		return nil, err
@@ -59,6 +59,6 @@ func CreateReconciler(ctx context.Context, controller controller.Controller[core
 		Reconciler: base,
 		Options:    &d.GetOptions().(*hostedzone.ReconcilerFactory).Options,
 	}
-	r.Info("using dataplane cluster", "apiserver", r.DataPlane.GetConfig().Host)
+	r.Info("using dataplane cluster", "apiserver", controller.GetCluster().GetInfo())
 	return reconciler.CRTReconcilerFor[*corednsv1alpha1.CoreDNSEntry](controller, r, 0), nil
 }

@@ -4,8 +4,9 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/objutils"
+	"github.com/mandelsoft/kubecrtutils/cluster"
+	. "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubecrtutils/objutils"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,25 +22,25 @@ func NewRuntimeMode(r *HostedZoneReconciler) Mode {
 	return &RuntimeMode{ModeImpl{r}}
 }
 
-func (m *RuntimeMode) RuntimeNamespace(key client.ObjectKey) string {
+func (m *RuntimeMode) RuntimeNamespace(c cluster.Cluster, key client.ObjectKey) string {
 	if m.Options.RuntimeNamespace != "" {
 		return m.Options.RuntimeNamespace
 	}
-	return objutils.GenerateUniqueName(BASE, "", key.Namespace, objutils.MAX_NAMESPACELEN)
+	return objutils.GenerateUniqueName(BASE, c.GetId(), "", key.Namespace, objutils.MAX_NAMESPACELEN)
 }
 
-func (m *RuntimeMode) RuntimeSecretName(key client.ObjectKey) string {
+func (m *RuntimeMode) RuntimeSecretName(c cluster.Cluster, key client.ObjectKey) string {
 	if m.Options.RuntimeNamespace != "" {
-		return objutils.GenerateUniqueName(BASE, "", key.Namespace, objutils.MAX_NAMESPACELEN)
+		return objutils.GenerateUniqueName(BASE, c.GetId(), "", key.Namespace, objutils.MAX_NAMESPACELEN)
 	}
 	return fmt.Sprintf("%s", BASE)
 }
 
-func (m *RuntimeMode) RuntimeDeploymentName(key client.ObjectKey) string {
+func (m *RuntimeMode) RuntimeDeploymentName(c cluster.Cluster, key client.ObjectKey) string {
 	if m.Options.RuntimeNamespace != "" {
-		return objutils.GenerateUniqueName(BASE, key.Namespace, key.Name, objutils.MAX_NAMELEN)
+		return objutils.GenerateUniqueName(BASE, c.GetId(), key.Namespace, key.Name, objutils.MAX_NAMELEN)
 	}
-	return objutils.GenerateUniqueName(BASE, "", key.Name, objutils.MAX_NAMELEN)
+	return objutils.GenerateUniqueName(BASE, c.GetId(), "", key.Name, objutils.MAX_NAMELEN)
 }
 
 func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting bool) (map[string]interface{}, error) {
@@ -55,7 +56,7 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting b
 		if !ctx.IsSimulate() {
 			m.index.Add(INDEX_SASECFRET, ctx.GetKey(), key)
 		}
-		err := m.DataPlane.Get(ctx, key, &secret)
+		err := ctx.Get(ctx, key, &secret)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				if deleting {
@@ -76,7 +77,7 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting b
 							"mandelsoft.org/generated": GENERATED,
 						},
 					)
-					err = m.DataPlane.Create(ctx, &secret)
+					err = ctx.Create(ctx, &secret)
 				}
 			}
 			if err != nil {
@@ -103,7 +104,7 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting b
 func (m *RuntimeMode) Prepare(ctx ReconcileContext) Problem {
 	// assure target namespace
 	var ns v1.Namespace
-	namespace := m.RuntimeNamespace(ctx.GetKey())
+	namespace := m.RuntimeNamespace(ctx, ctx.GetKey())
 	err := m.Runtime.Get(ctx, client.ObjectKey{Name: namespace}, &ns)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -128,7 +129,7 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) Problem {
 	}
 
 	var secret v1.Secret
-	if err := m.DataPlane.Get(ctx, key, &secret); err != nil {
+	if err := ctx.Get(ctx, key, &secret); err != nil {
 		if !errors.IsNotFound(err) {
 			return TemporaryProblem(err)
 		}
@@ -136,7 +137,7 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) Problem {
 	} else {
 		if secret.GetDeletionTimestamp().IsZero() {
 			ctx.Info("request deletion of serviceaccount secret {{secret}}", "secret", key)
-			err = m.DataPlane.Delete(ctx, &secret)
+			err = ctx.Delete(ctx, &secret)
 			if err != nil {
 				if !errors.IsNotFound(err) {
 					return TemporaryProblem(err)
@@ -151,7 +152,7 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) Problem {
 
 	if m.Options.RuntimeNamespace == "" {
 		var ns v1.Namespace
-		namespace := m.RuntimeNamespace(ctx.GetKey())
+		namespace := m.RuntimeNamespace(ctx, ctx.GetKey())
 		m.Info("deleting namespace {{namespace}}", "namespace", namespace)
 		err := m.Runtime.Get(ctx, client.ObjectKey{Name: namespace}, &ns)
 		if err != nil {

@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	"github.com/go-test/deep"
+	"github.com/mandelsoft/kubecrtutils/cluster"
+	. "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
+	"github.com/mandelsoft/kubecrtutils/owner"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	clusterutils2 "github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
-	. "github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/owner"
 	"github.com/mandelsoft/kubedns/pkg/render"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +38,7 @@ type ReconcileRequest struct {
 	reconciler.DefaultReconcileRequest[*corednsv1alpha1.HostedZone, *HostedZoneReconciler]
 }
 
-var _ clusterutils2.OperationContext = (*ReconcileRequest)(nil)
+var _ cluster.OperationContext = (*ReconcileRequest)(nil)
 
 func (r *ReconcileRequest) UpdateStatus() Problem {
 	p := r.DefaultReconcileRequest.UpdateStatus()
@@ -97,13 +97,13 @@ func (r *ReconcileRequest) Reconcile() Problem {
 		// Remove finalizer from slave and update
 		if controllerutil.RemoveFinalizer(obj, r.Reconciler.Finalizer) {
 			r.Info("removing finalizer for slave zone")
-			if err := r.Reconciler.DataPlane.Patch(r, obj, patch); err != nil {
+			if err := r.Patch(r, obj, patch); err != nil {
 				return TemporaryProblem(client.IgnoreNotFound(err))
 			}
 		}
 	} else {
 		if controllerutil.AddFinalizer(obj, r.Reconciler.Finalizer) {
-			if err := r.Reconciler.DataPlane.Patch(r, obj, patch); err != nil {
+			if err := r.Patch(r, obj, patch); err != nil {
 				return TemporaryProblem(client.IgnoreNotFound(err))
 			}
 			r.Info("taking responsibility")
@@ -161,7 +161,7 @@ func (r *ReconcileRequest) GetFieldManager() string {
 	return r.Reconciler.FieldManager
 }
 
-func (r *ReconcileRequest) Modify(obj client.Object) error {
+func (r *ReconcileRequest) Modify(cluster cluster.CLuster, obj client.Object) error {
 	return nil
 }
 
@@ -670,10 +670,6 @@ var _ ReconcileContext = (*ReconcileRequest)(nil)
 
 func (r *ReconcileRequest) IsSimulate() bool {
 	return false
-}
-
-func (r *ReconcileRequest) GetDataPlaneURL() string {
-	return r.Reconciler.DataPlaneURL
 }
 
 func (r *ReconcileRequest) GetPlatform() string {

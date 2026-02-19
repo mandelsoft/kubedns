@@ -6,8 +6,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/objutils"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubecrtutils/objutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

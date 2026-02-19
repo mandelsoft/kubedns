@@ -4,15 +4,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/mandelsoft/kubecrtutils/controller"
+	"github.com/mandelsoft/kubecrtutils/controller/builder"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
+	"github.com/mandelsoft/kubecrtutils/index"
+	"github.com/mandelsoft/kubecrtutils/objutils/objfilter"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/index"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/objutils"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/owner"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	crtreconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -20,7 +18,7 @@ type ReconcilerFactory struct {
 	Options
 }
 
-func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller controller.Controller[corednsv1alpha1.HostedZone, *corednsv1alpha1.HostedZone], b *builder.Builder) (crtreconcile.Reconciler, error) {
+func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller controller.TypedController[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone], b builder.Builder) (crtreconcile.Reconciler, error) {
 	logger := controller.GetLogger()
 	logger.Info("creating hostedzone reconciler...")
 	base, err := common.NewReconciler(controller)
@@ -31,7 +29,7 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 
 	r := &HostedZoneReconciler{
 		Reconciler: base,
-		Runtime:    clusters.Get("runtime"),
+		Runtime:    clusters.Get("runtime").AsCluster(),
 		index:      index.NewUntyped(),
 		Options:    &f.Options,
 	}
@@ -48,9 +46,9 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 	}
 	r.Finalizer = r.FieldManager
 
-	r.Info("using dataplane cluster", "apiserver", r.DataPlane.GetConfig().Host)
-	if !r.Runtime.IsSameAs(r.DataPlane) {
-		r.Info("using separated runtime cluster", "apiserver", r.Runtime.GetConfig().Host)
+	r.Info("using dataplane {{type}} {{info}}", "type", r.XXX.GetTypeInfo(), "info", r.XXX.GetInfo())
+	if !r.Runtime.IsSameAs(r.XXX) {
+		r.Info("using separated runtime cluster", "apiserver", r.Runtime.GetInfo())
 	} else {
 		r.Info("using same cluster as runtime")
 	}
@@ -62,21 +60,16 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 	r.Info("using Finalizer '{{finalizer}}'", "finalizer", r.Finalizer)
 	r.Info("using Nameserver mode '{{mode}}'", "mode", r.Options.DNSMode)
 
-	u, _, err := rest.DefaultServerUrlFor(r.DataPlane.GetConfig())
-	if err != nil {
-		return nil, err
-	}
-	r.DataPlaneURL = u.String()
 	m, err := GetManifests()
 	if err != nil {
 		return nil, err
 	}
 	r.Manifests = m
 
-	r.runtimeOwner = owner.Conditional(owner.For(r.DataPlane, r.Runtime), objutils.Or(
-		objutils.GroupKindFilter("core", "Service"),
-		objutils.GroupKindFilter("apps", "Deployment"),
-	))
+	r.ownerFilter = objfilter.Or(
+		objfilter.GroupKind("core", "Service"),
+		objfilter.GroupKind("apps", "Deployment"),
+	)
 
 	if r.IsSeparateRuntime() {
 		r.Info("using separated runtime namespace", "namespace", r.Options.RuntimeNamespace)

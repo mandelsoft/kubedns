@@ -1,14 +1,15 @@
 package hostedzone
 
 import (
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/controller/controllerutils/reconcile"
+	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Mode interface {
-	RuntimeNamespace(key client.ObjectKey) string
-	RuntimeSecretName(key client.ObjectKey) string
-	RuntimeDeploymentName(key client.ObjectKey) string
+	RuntimeNamespace(c cluster.Cluster, key client.ObjectKey) string
+	RuntimeSecretName(c cluster.Cluster, key client.ObjectKey) string
+	RuntimeDeploymentName(c cluster.Cluster, key client.ObjectKey) string
 
 	AccessValues(ctx ReconcileContext, name string, deleting bool) (map[string]interface{}, error)
 
