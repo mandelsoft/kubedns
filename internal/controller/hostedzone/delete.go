@@ -33,13 +33,13 @@ func (r *ReconcileRequest) DeleteExternalResources() Problem {
 	if len(dnsruntime) > 0 {
 		r.Info("deleting nameserver dns runtime resources")
 		for _, data := range runtime {
-			prob = AggregateProblem(prob, r.DeleteManifest(r.Reconciler.Runtime, data))
+			prob = AggregateProblem(prob, r.DeleteManifest(data, r.Reconciler.Runtime))
 		}
 	}
 	if len(dnsdataplane) > 0 {
 		r.Info("deleting nameserver dns dataplane resources")
 		for _, data := range dataplane {
-			prob = AggregateProblem(prob, r.DeleteManifest(r.Reconciler.DataPlane, data))
+			prob = AggregateProblem(prob, r.DeleteManifest(data))
 		}
 	}
 	if prob != nil {
@@ -49,12 +49,12 @@ func (r *ReconcileRequest) DeleteExternalResources() Problem {
 
 	r.Info("deleting runtime resources")
 	for _, data := range runtime {
-		prob = AggregateProblem(prob, r.DeleteManifest(r.Reconciler.Runtime, data))
+		prob = AggregateProblem(prob, r.DeleteManifest(data, r.Reconciler.Runtime))
 	}
 
 	r.Info("deleting dataplane resources")
 	for _, data := range dataplane {
-		prob = AggregateProblem(prob, r.DeleteManifest(r.Reconciler.DataPlane, data))
+		prob = AggregateProblem(prob, r.DeleteManifest(data))
 	}
 
 	if prob == nil {

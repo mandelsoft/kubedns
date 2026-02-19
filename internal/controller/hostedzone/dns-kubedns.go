@@ -99,7 +99,7 @@ func (d *dnsKubedns) GetCNames(ctx *DNSContext) ([]string, reconcile.Problem) {
 	}
 
 	var entry corednsv1alpha1.CoreDNSEntry
-	err := ctx.Reconciler.DataPlane.Get(ctx, client.ObjectKey{Namespace: "dns-system", Name: d.getEntryName(ctx)}, &entry)
+	err := ctx.Get(ctx, client.ObjectKey{Namespace: "dns-system", Name: d.getEntryName(ctx)}, &entry)
 	if err != nil {
 		return nil, reconcile.TemporaryProblem(err)
 	}

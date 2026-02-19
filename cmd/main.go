@@ -4,12 +4,12 @@ import (
 	"os"
 
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/ctrlmgmt"
+	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
+	"github.com/mandelsoft/kubecrtutils/options/mlogopts"
+	"github.com/mandelsoft/kubecrtutils/setup"
 	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/ctrlmgmt"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/metricsopts"
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/options/mlogopts"
-	"github.com/mandelsoft/kubedns/pkg/setup"
 	"github.com/spf13/pflag"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -60,7 +60,7 @@ func main() {
 		// other options
 	)
 
-	err := ctrlmgmt.Setup(options, def, os.Args[1:]...)
+	err := ctrlmgmt.Setup("dnsmanager", options, def, os.Args[1:]...)
 	if err == pflag.ErrHelp {
 		os.Exit(0)
 	}

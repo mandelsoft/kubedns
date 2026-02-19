@@ -86,7 +86,7 @@ func (r *HostedZoneReconciler) TriggerEntries(ctx context.Context, logger loggin
 	return nil
 }
 
-func (r *HostedZoneReconciler) GetRootInfo(ctx ReconcileRequest, logger logging.Logger, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, Problem) {
+func (r *HostedZoneReconciler) GetRootInfo(ctx *ReconcileRequest, logger logging.Logger, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, Problem) {
 	var path string
 	var directParent *corednsv1alpha1.HostedZone
 

@@ -118,7 +118,7 @@ func (r *ReconcileRequest) responsibleForEntry() (*Responsibility, reconcile.Pro
 	for {
 		var zone corednsv1alpha1.HostedZone
 		path = path + "/" + n.Name
-		err := r.Reconciler.DataPlane.Get(r, n, &zone)
+		err := r.Get(r, n, &zone)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				resp.Error = fmt.Sprintf("zone %q not found", n.Name)

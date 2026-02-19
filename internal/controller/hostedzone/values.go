@@ -29,14 +29,23 @@ type reconcileContext struct {
 	context.Context
 	cluster.Cluster
 	client.ObjectKey
-	Platform  string
-	APIServer string
+	Platform string
+
+	apiServer string
+	clusterId string
 
 	Simulate bool
 }
 
-func NewReconcileContext(ctx context.Context, log logging.Logger, server string, platform string, key client.ObjectKey) reconcileContext {
-	return reconcileContext{Logger: log, Context: ctx, APIServer: server, ObjectKey: key, Platform: platform}
+func NewReconcileContext(ctx context.Context, log logging.Logger, server string, clusterId string, platform string, key client.ObjectKey) reconcileContext {
+	return reconcileContext{Logger: log, Context: ctx, apiServer: server, clusterId: clusterId, ObjectKey: key, Platform: platform}
+}
+
+func (c reconcileContext) GetId() string {
+	if c.clusterId != "" {
+		return c.clusterId
+	}
+	return c.Cluster.GetId()
 }
 
 func (c reconcileContext) IsSimulate() bool {
@@ -52,10 +61,10 @@ func (c reconcileContext) GetKey() client.ObjectKey {
 }
 
 func (c reconcileContext) GetAPIServerURL() (*url.URL, error) {
-	if c.APIServer == "" {
+	if c.apiServer == "" {
 		return c.Cluster.GetAPIServerURL()
 	}
-	return url.Parse(c.APIServer)
+	return url.Parse(c.apiServer)
 }
 
 func (c reconcileContext) Values(m Mode, deleting bool) (map[string]interface{}, error) {

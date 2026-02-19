@@ -1,7 +1,7 @@
 package common
 
 import (
-	"github.com/mandelsoft/kubedns/pkg/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/cluster"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 

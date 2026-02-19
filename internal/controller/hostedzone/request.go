@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-test/deep"
+	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	. "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
@@ -144,7 +145,7 @@ func (r *ReconcileRequest) delete() Problem {
 				patch := client.MergeFrom(r.GetOrig())
 
 				r.Info("finally removing finalizer")
-				if err := r.Reconciler.DataPlane.Patch(r, obj, patch); err != nil {
+				if err := r.Patch(r, obj, patch); err != nil {
 					return TemporaryProblem(client.IgnoreNotFound(err))
 				}
 			} else {
@@ -161,7 +162,8 @@ func (r *ReconcileRequest) GetFieldManager() string {
 	return r.Reconciler.FieldManager
 }
 
-func (r *ReconcileRequest) Modify(cluster cluster.CLuster, obj client.Object) error {
+func (r *ReconcileRequest) Modify(cluster cluster.Cluster, obj client.Object) error {
+	// no standard modification of resources by reconcile context
 	return nil
 }
 
@@ -281,7 +283,7 @@ func (r *ReconcileRequest) UpdateObject() error {
 	if r.Orig != nil && !reflect.DeepEqual(r.Object.Status, r.Orig.Status) {
 		diff := deep.Equal(&r.Object.Status, &r.Orig.Status)
 		r.Info("status of hosted zone changed", "diff", diff)
-		if err := r.Reconciler.DataPlane.Status().Update(r, r.Object); err != nil {
+		if err := r.Status().Update(r, r.Object); err != nil {
 			return fmt.Errorf("failed to update changed status: %w", err)
 		}
 		r.TriggerChildren()
@@ -295,8 +297,8 @@ func (r *ReconcileRequest) UpdateObject() error {
 	return nil
 }
 
-func (r *ReconcileRequest) ApplyData(octx clusterutils2.OperationContext, data []byte, mod ...*clusterutils2.ModificationInfo) (*unstructured.Unstructured, error) {
-	o, err := clusterutils2.ClientSideApply(r.Reconciler.Runtime, octx, data, mod...)
+func (r *ReconcileRequest) ApplyData(octx cluster.OperationContext, data []byte, mod ...*cluster.ModificationInfo) (*unstructured.Unstructured, error) {
+	o, err := cluster.ClientSideApply(r.Reconciler.Runtime, octx, data, mod...)
 	if err != nil {
 		meta.SetStatusCondition(&r.Object.Status.Conditions, metav1.Condition{
 			Type:    corednsv1alpha1.RuntimeConditionType,
@@ -307,10 +309,6 @@ func (r *ReconcileRequest) ApplyData(octx clusterutils2.OperationContext, data [
 		return o, err
 	}
 	return o, err
-}
-
-func (r *ReconcileRequest) DeleteData(octx clusterutils2.OperationContext, data []byte) Problem {
-	return r.DeleteManifest(r.Reconciler.Runtime, data)
 }
 
 func (r *ReconcileRequest) HandleExternalResources() Problem {
@@ -335,9 +333,9 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 
 	r.Info("updating dataplane")
 
-	var modified clusterutils2.ModificationInfo
+	var modified cluster.ModificationInfo
 	for _, data := range dataplane {
-		_, err := clusterutils2.ClientSideApply(r.Reconciler.DataPlane, r, data, &modified)
+		_, err := cluster.ClientSideApply(r.Cluster, r, data, &modified)
 		if err != nil {
 			return TemporaryProblemf("error deploying dataplane: %s", err.Error())
 		}
@@ -361,11 +359,13 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		var svcName client.ObjectKey
 
 		r.Info("updating runtime")
-		octx := clusterutils2.WithModification(r,
+		octx := cluster.WithModification(r,
 			// set owners
-			owner.AddOwnerModifier(r.Reconciler.runtimeOwner, r.Object),
+			owner.AddOwnerModifier(r, r.Object, r.Reconciler.ownerFilter, r.GetController().GetOwnerHandler()),
 			// adapt to provide DNS records for nameservers
-			func(obj client.Object) error { return r.Reconciler.Options.DNSHandler.Modify(&dnsctx, obj) },
+			cluster.ObjectModifierFunc(func(_ cluster.Cluster, obj client.Object) error {
+				return r.Reconciler.Options.DNSHandler.Modify(&dnsctx, obj)
+			}),
 		)
 
 		// apply standard manifests
@@ -374,7 +374,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 			o, err := r.ApplyData(octx, data, &modified)
 			if err != nil {
 				if checkNotModifiableError(err) {
-					r.DeleteData(octx, data)
+					r.DeleteManifest(data, r.Reconciler.Runtime)
 				}
 				return TemporaryProblemf("error deploying runtime: %s", err.Error())
 			}
@@ -408,7 +408,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		if len(dnsdataplane) > 0 {
 			r.Info("found {{amount}} dns dataplane manifests", "amount", len(dnsdataplane))
 			for _, data := range dnsdataplane {
-				_, err := clusterutils2.ClientSideApply(r.Reconciler.DataPlane, r, data, &modified)
+				_, err := cluster.ClientSideApply(r.Cluster, r, data, &modified)
 				if err != nil {
 					return TemporaryProblemf("error deploying nameserver dns dataplane: %s", err.Error())
 				}
@@ -510,7 +510,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 	return nil
 }
 
-func (r *ReconcileRequest) DeleteManifest(cluster clusterutils2.Cluster, manifest []byte) Problem {
+func (r *ReconcileRequest) DeleteManifest(manifest []byte, cluster ...cluster.Cluster) Problem {
 	obj := unstructured.Unstructured{}
 	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	_, _, err := dec.Decode(manifest, nil, &obj)
@@ -524,20 +524,21 @@ func (r *ReconcileRequest) DeleteManifest(cluster clusterutils2.Cluster, manifes
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}
-	err = cluster.Get(r, key, &current)
+	cl := general.OptionalDefaulted(r.Cluster, cluster...)
+	err = cl.Get(r, key, &current)
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.Info("object {{kind}} {{key}} already gone", "kind", obj.GroupVersionKind().GroupKind(), "key", key, "target", cluster.GetName())
+			r.Info("object {{kind}} {{key}} already gone", "kind", obj.GroupVersionKind().GroupKind(), "key", key, "target", cl.GetName())
 			return nil
 		}
-		return TemporaryProblemf("error getting object %s from %s: %s", key, cluster.GetName(), err.Error())
+		return TemporaryProblemf("error getting object %s from %s: %s", key, cl.GetName(), err.Error())
 	}
 	if !current.GetDeletionTimestamp().IsZero() {
 		return Requeuef("resource %q is still being deleted", key)
 	}
-	r.Info("deleting object {{kind}} {{key}}", "kind", obj.GroupVersionKind().GroupKind(), "key", key, "target", cluster.GetName())
-	err = cluster.GetClient().Delete(r, &obj)
+	r.Info("deleting object {{kind}} {{key}}", "kind", obj.GroupVersionKind().GroupKind(), "key", key, "target", cl.GetName())
+	err = cl.Delete(r, &obj)
 	if errors.IsNotFound(err) {
 		return nil
 	}

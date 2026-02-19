@@ -55,7 +55,7 @@ func TestRenderManifests(logger logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	ctx := NewReconcileContext(context.Background(), logger, "http://api.server", "aws", client.ObjectKey{Name: "myzone", Namespace: "default"})
+	ctx := NewReconcileContext(context.Background(), logger, "http://api.server", "testcluster", "aws", client.ObjectKey{Name: "myzone", Namespace: "default"})
 	ctx.Simulate = true
 
 	r := &HostedZoneReconciler{
