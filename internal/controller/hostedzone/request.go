@@ -219,17 +219,19 @@ func (r *ReconcileRequest) IsResponsibile() (bool, *Responsibility, Problem) {
 		}
 		return false, nil, prob
 	}
+	r.Info("root {{root}}, runtime {{runtime}}, class {{class}}", "root", info.Root.Name, "runtime", info.Runtime, "class", info.Class)
+
 	if force {
 		return true, info, nil
 	}
 	new := info.Runtime == r.Reconciler.Options.Runtime && info.Class == r.Reconciler.Options.Class
-	r.Info("checking match", "root", info.Root.Name, "match", new, "runtime", info.Runtime, "class", info.Class)
+	r.Info("checking match: {{match}}", "match", new)
 	if info.Root.Status.Observed == nil {
 		return new, info, nil
 	}
 
 	match := info.Root.Status.Observed.Class == r.Reconciler.Options.Class && info.Root.Status.Observed.Runtime == r.Reconciler.Options.Runtime
-	r.Info("checking registered match", "root", info.Root.Name, "match", new, "runtime", info.Root.Status.Observed.Runtime, "class", info.Root.Status.Observed.Class)
+	r.Info("checking registered match for class {{observed}}: {{match}}", "match", new, "observed", info.Root.Status.Observed.Class)
 	return match, info, nil
 
 }
@@ -350,7 +352,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		return nil // tre-rigger by watch
 	}
 
-	if true {
+	if false {
 		dnsctx := DNSContext{
 			ReconcileRequest: r,
 		}

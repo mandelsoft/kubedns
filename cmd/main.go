@@ -3,8 +3,12 @@ package main
 import (
 	"os"
 
+	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
+	kcpcorev1alpha1 "github.com/kcp-dev/sdk/apis/core/v1alpha1"
+	kcptenancyv1alpha1 "github.com/kcp-dev/sdk/apis/tenancy/v1alpha1"
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/cluster/fleet/kcp"
 	"github.com/mandelsoft/kubecrtutils/ctrlmgmt"
 	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
 	"github.com/mandelsoft/kubecrtutils/options/mlogopts"
@@ -30,6 +34,10 @@ var (
 )
 
 func init() {
+	utilruntime.Must(kcpcorev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(kcptenancyv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(kcpapisv1alpha1.AddToScheme(scheme))
+
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(corednsv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
@@ -45,7 +53,7 @@ func main() {
 		WithScheme(scheme).
 		AddCluster(
 			cluster.Define("runtime", "runtime cluster").WithFallback("dataplane"),
-			cluster.Define("dataplane", "user api cluster").WithFallback(cluster.DEFAULT),
+			cluster.DefineFleet("dataplane", "user api cluster", kcp.Type()).WithFallback(cluster.DEFAULT),
 		).
 		AddController(
 			hostedzone.Controller(),

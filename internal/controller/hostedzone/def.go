@@ -19,6 +19,7 @@ package hostedzone
 import (
 	"context"
 
+	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/controller"
 	reconcile2 "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
 	"github.com/mandelsoft/kubecrtutils/types"
@@ -38,10 +39,11 @@ func Controller() controller.Definition {
 	return controller.Define[*corednsv1alpha1.HostedZone](common.ControllerHostedzone, "dataplane", &ReconcilerFactory{}).
 		UseCluster("runtime").
 		AddIndex(common.IndexKeyZoneParent, parentIndexer).
+		ImportIndex(cacheindex.Ref[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](common.IndexKeyEntryZone, "dataplane")).
 		AddTrigger(
 			controller.OwnerTrigger[*appsv1.Deployment]().OnCluster("runtime"),
 			controller.OwnerTrigger[*corev1.Secret]().OnCluster("runtime"),
-			controller.LocalResourceTriggerByFactory[*corev1.Secret](secretTriggerFactory),
+			controller.LocalResourceTriggerByFactory[*corev1.Secret](secretTriggerFactory).OnCluster("runtime"),
 		)
 }
 
