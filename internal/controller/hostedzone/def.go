@@ -21,7 +21,8 @@ import (
 
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/controller"
-	reconcile2 "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
+	"github.com/mandelsoft/kubecrtutils/controller/handler"
 	"github.com/mandelsoft/kubecrtutils/types"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
@@ -29,8 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	sigreconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const INDEX_SASECFRET = "serviceaccount-secret"
@@ -54,11 +54,11 @@ func parentIndexer(o *corednsv1alpha1.HostedZone) []string {
 	return []string{o.Spec.ParentRef}
 }
 
-func secretTriggerFactory(ctx context.Context, cntr types.Controller) handler.TypedMapFunc[*corev1.Secret, reconcile.Request] {
-	r := cntr.GetReconciler().(reconcile2.CRTReconciler).GetEffective().(*HostedZoneReconciler)
+func secretTriggerFactory(ctx context.Context, cntr types.Controller) (handler.TypedMapFuncFactory[*corev1.Secret, sigreconcile.Request], error) {
+	r := cntr.GetReconciler().(reconciler.CRTReconciler).GetEffective().(*HostedZoneReconciler)
 	log := cntr.GetLogger()
-	return func(ctx context.Context, obj *corev1.Secret) []reconcile.Request {
-		var trigger []reconcile.Request
+	return handler.LiftToCluster(func(ctx context.Context, obj *corev1.Secret) []sigreconcile.Request {
+		var trigger []sigreconcile.Request
 		key := client.ObjectKeyFromObject(obj)
 		users := r.index.UsersFor(INDEX_SASECFRET, key)
 		if len(users) > 0 {
@@ -72,11 +72,11 @@ func secretTriggerFactory(ctx context.Context, cntr types.Controller) handler.Ty
 				Namespace: user.Namespace,
 			}
 			trigger = append(trigger,
-				reconcile.Request{
+				sigreconcile.Request{
 					NamespacedName: zone,
 				},
 			)
 		}
 		return trigger
-	}
+	}), nil
 }

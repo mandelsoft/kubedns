@@ -200,9 +200,9 @@ func (r *ReconcileRequest) IsResponsibile() (bool, *Responsibility, Problem) {
 	if controllerutil.ContainsFinalizer(obj, r.Reconciler.Finalizer) {
 		force = true
 	}
-	r.Info("lookup root")
 	info, ok, prob := r.Reconciler.GetRootInfo(r, r, obj)
 	if prob != nil && prob.Error() != nil { // no incomplete state
+		r.Info("lookup root with problem {{problem}}", "problem", prob)
 		if prob.Requeue() {
 			return false, nil, prob
 		}
@@ -219,10 +219,11 @@ func (r *ReconcileRequest) IsResponsibile() (bool, *Responsibility, Problem) {
 		}
 		return false, nil, prob
 	}
-	r.Info("root {{root}}, runtime {{runtime}}, class {{class}}", "root", info.Root.Name, "runtime", info.Runtime, "class", info.Class)
+	r.Info("root '{{root}}', runtime '{{runtime}}', class '{{class}}'", "root", info.Root.Name, "runtime", info.Runtime, "class", info.Class)
 
 	if force {
 		return true, info, nil
+
 	}
 	new := info.Runtime == r.Reconciler.Options.Runtime && info.Class == r.Reconciler.Options.Class
 	r.Info("checking match: {{match}}", "match", new)
@@ -349,10 +350,10 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		r.Info("dataplane still pending: {{reason}} -> requeue", "reason", repeat.Error())
 		r.Eventf(r.Object, corev1.EventTypeNormal, "DataplanePending", "Dataplane still pending")
 
-		return nil // tre-rigger by watch
+		return nil // re-rigger by watch
 	}
 
-	if false {
+	if true {
 		dnsctx := DNSContext{
 			ReconcileRequest: r,
 		}
