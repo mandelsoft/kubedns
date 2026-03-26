@@ -20,7 +20,7 @@ type Reconciler struct {
 	logging.Logger
 	FieldManager string
 
-	XXX         cluster.ClusterEquivalent
+	Dataplane   cluster.ClusterEquivalent
 	ParentIndex cacheindex.TypedIndex[corednsv1alpha1.HostedZone]
 	EntryIndex  cacheindex.TypedIndex[corednsv1alpha1.CoreDNSEntry]
 }
@@ -38,7 +38,7 @@ func NewReconciler(c controller.Controller) (*Reconciler, error) {
 	return &Reconciler{
 		Logger:       c.GetLogger(),
 		FieldManager: c.GetFieldManager(),
-		XXX:          c.GetCluster(),
+		Dataplane:    c.GetCluster(),
 		ParentIndex:  pidx,
 		EntryIndex:   eidx,
 	}, nil

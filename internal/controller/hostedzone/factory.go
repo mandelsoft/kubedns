@@ -46,8 +46,8 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 	}
 	r.Finalizer = r.FieldManager
 
-	r.Info("using dataplane {{type}} {{info}}", "type", r.XXX.GetTypeInfo(), "info", r.XXX.GetInfo())
-	if !r.Runtime.IsSameAs(r.XXX) {
+	r.Info("using dataplane {{type}} {{info}}", "type", r.Dataplane.GetTypeInfo(), "info", r.Dataplane.GetInfo())
+	if !r.Runtime.IsSameAs(r.Dataplane) {
 		r.Info("using separated runtime cluster", "apiserver", r.Runtime.GetInfo())
 	} else {
 		r.Info("using same cluster as runtime")

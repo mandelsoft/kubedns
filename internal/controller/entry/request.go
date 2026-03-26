@@ -106,7 +106,7 @@ func (r *ReconcileRequest) Reconcile() reconcile.Problem {
 
 func (r *ReconcileRequest) UpdateStatus() reconcile.Problem {
 	r.Info("update status '{{state}}' '{{message}}'", "state", r.Object.Status.State, "message", r.Object.Status.Message)
-	return r.UpdateStatus()
+	return r.DefaultReconcileRequest.UpdateStatus()
 }
 
 func (r *ReconcileRequest) responsibleForEntry() (*Responsibility, reconcile.Problem) {

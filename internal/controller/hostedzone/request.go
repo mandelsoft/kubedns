@@ -321,6 +321,12 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		return prob
 	}
 
+	url, err := r.GetAPIServerURL()
+	if err != nil {
+		return Failed(fmt.Errorf("cannot determine api server URL: %w", err))
+	}
+
+	r.Info("using api server URL: {{url}}", "url", url)
 	values, repeat := r.Values(r.Reconciler.Mode, false)
 
 	if repeat != nil {

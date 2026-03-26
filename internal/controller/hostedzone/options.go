@@ -9,6 +9,7 @@ import (
 	"github.com/mandelsoft/goutils/errors"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/options/manageropts"
+	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -40,9 +41,18 @@ func NewOptions() *Options {
 	return &Options{}
 }
 
+func (*Options) Prepare(ctx context.Context, opts flagutils.OptionSet, v flagutils.PreparationSet) error {
+	return common.Assure(opts)
+}
+
 func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	var err error
 
+	copt := common.From(opts)
+	if copt == nil {
+		return fmt.Errorf("class option not found in option definitions")
+	}
+	o.Class = copt.Class
 	clusters, err := cluster.ValidatedClusters(ctx, opts, v)
 	if err != nil {
 		return err
@@ -62,7 +72,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	modes := DNSModes.Names()
 	fs.StringVarP(&o.RuntimeNamespace, "runtime-namespace", "", "", "use single runtime namespace for deployments")
 	fs.StringVarP(&o.Runtime, "runtime", "", "", "name of the runtime class to handle")
-	fs.StringVarP(&o.Class, "class", "", "", "name of the controller class to handle")
 
 	fs.StringVarP(&o.DNSMode, "dns-mode", "", "loadbalancer", fmt.Sprintf("DNS mode for providing nameserver cnames [%s]", strings.Join(modes, ",")))
 	fs.StringVarP(&o.DNSDomain, "dns-domain", "", "", "DNS domain for managed nameserver DNS names")

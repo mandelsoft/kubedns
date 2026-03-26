@@ -58,7 +58,7 @@ func (r *HostedZoneReconciler) Request(def *reconciler.BaseRequest[*corednsv1alp
 }
 
 func (r *HostedZoneReconciler) IsSeparateRuntime() bool {
-	return r.Options.RuntimeNamespace != "" || !r.XXX.IsSameAs(r.Runtime)
+	return r.Options.RuntimeNamespace != "" || !r.Dataplane.IsSameAs(r.Runtime)
 }
 
 func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger logging.Logger, obj client.ObjectKey) error {
@@ -69,7 +69,7 @@ func (r *HostedZoneReconciler) TriggerChildren(ctx context.Context, logger loggi
 	}
 	for _, c := range children {
 		logger.Info("triggering child", "name", c.Name, "namespace", c.Namespace)
-		r.XXX.EnqueueByObject(ctx, &c)
+		r.Dataplane.EnqueueByObject(ctx, &c)
 	}
 	return nil
 }
@@ -81,7 +81,7 @@ func (r *HostedZoneReconciler) TriggerEntries(ctx context.Context, logger loggin
 	}
 	logger.Info("notify {{amount}} children about changes", "amount", len(entries))
 	for _, c := range entries {
-		r.XXX.EnqueueByObject(ctx, &c)
+		r.Dataplane.EnqueueByObject(ctx, &c)
 	}
 	return nil
 }

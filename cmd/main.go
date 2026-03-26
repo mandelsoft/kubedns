@@ -10,10 +10,12 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet/kcp"
 	"github.com/mandelsoft/kubecrtutils/ctrlmgmt"
+	"github.com/mandelsoft/kubecrtutils/options/activationopts"
 	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
 	"github.com/mandelsoft/kubecrtutils/options/mlogopts"
 	"github.com/mandelsoft/kubecrtutils/setup"
-	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
+	entrydown "github.com/mandelsoft/kubedns/internal/controller/replicate/entry/down"
+	entryup "github.com/mandelsoft/kubedns/internal/controller/replicate/entry/up"
 	"github.com/spf13/pflag"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -26,6 +28,7 @@ import (
 
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/entry"
+	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -49,22 +52,28 @@ func main() {
 	setup.ExitIfErr(hostedzone.TestRenderManifests(setup.Log), "problems with included manifests")
 	setup.ExitIfErr(hostedzone.TestRenderKubeDNSManifests(setup.Log), "problems with included dns manifests")
 
-	def := ctrlmgmt.Define(corednsv1alpha1.GroupVersion.Group, "dataplane").
+	def := ctrlmgmt.Define(corednsv1alpha1.GroupVersion.Group, "source").
 		WithScheme(scheme).
 		AddCluster(
 			cluster.Define("runtime", "runtime cluster").WithFallback("dataplane"),
-			cluster.DefineFleet("dataplane", "user api cluster", kcp.Type()).WithFallback(cluster.DEFAULT),
+			cluster.DefineFleet("dataplane", "api cluster for functional controllers", kcp.Type()).WithFallback("target"),
+			cluster.DefineFleet("source", "user api cluster", kcp.Type()).WithFallback(cluster.DEFAULT),
+			cluster.Define("target", "replication target").WithFallback("source"),
 		).
 		AddController(
 			hostedzone.Controller(),
 			entry.Controller(),
+
+			entryup.Controller(),
+			entrydown.Controller(),
 		)
 
-	options := flagutils.DefaultOptionSet{}
+	options := &flagutils.DefaultOptionSet{}
 
 	options.Add(
-		metricsopts.New(),  // options to control the manager metrics service
-		mlogopts.New(true), // options to control mandelsoft/logging
+		metricsopts.New(),    // options to control the manager metrics service
+		mlogopts.New(true),   // options to control mandelsoft/logging
+		activationopts.New(), // enable controller selection
 		// other options
 	)
 

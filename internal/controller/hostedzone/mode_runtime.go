@@ -95,6 +95,7 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting b
 	access := map[string]interface{}{}
 	access["token"] = string(token)
 	cert := secret.Data["ca.crt"]
+	ctx.Info("  cadata", "cadata", string(cert))
 	if cert != nil {
 		access["cadata"] = string(cert)
 	}

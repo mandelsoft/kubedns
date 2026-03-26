@@ -38,6 +38,7 @@ const INDEX_SASECFRET = "serviceaccount-secret"
 func Controller() controller.Definition {
 	return controller.Define[*corednsv1alpha1.HostedZone](common.ControllerHostedzone, "dataplane", &ReconcilerFactory{}).
 		UseCluster("runtime").
+		InGroup("functional").
 		AddIndex(common.IndexKeyZoneParent, parentIndexer).
 		ImportIndex(cacheindex.Ref[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](common.IndexKeyEntryZone, "dataplane")).
 		AddTrigger(
