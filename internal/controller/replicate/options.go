@@ -15,8 +15,9 @@ import (
 )
 
 type Options struct {
-	TargetNamespace string
 	Class           string
+	TargetClass     string
+	TargetNamespace string
 
 	OwnerHandler owner.Handler
 	lock         sync.RWMutex
@@ -65,6 +66,7 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&o.TargetNamespace, "target-namespace", "", "", "namespace used to request nameserver DNS names")
+	fs.StringVarP(&o.TargetClass, "target-class", "", "", "target class for replication")
 }
 
 func (o *Options) GetOriginal(key client.ObjectKey) *mcreconcile.Request {
@@ -83,7 +85,7 @@ func (o *Options) SetOriginal(key client.ObjectKey, tgt mcreconcile.Request) {
 	o.index[key] = tgt
 }
 
-func (o *Options) DeleteOriginal(key client.ObjectKey, tgt mcreconcile.Request) {
+func (o *Options) DeleteOriginal(key client.ObjectKey) {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 	delete(o.index, key)

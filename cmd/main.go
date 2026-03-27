@@ -16,6 +16,8 @@ import (
 	"github.com/mandelsoft/kubecrtutils/setup"
 	entrydown "github.com/mandelsoft/kubedns/internal/controller/replicate/entry/down"
 	entryup "github.com/mandelsoft/kubedns/internal/controller/replicate/entry/up"
+	zonedown "github.com/mandelsoft/kubedns/internal/controller/replicate/hostedzone/down"
+	zoneup "github.com/mandelsoft/kubedns/internal/controller/replicate/hostedzone/up"
 	"github.com/spf13/pflag"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -57,8 +59,8 @@ func main() {
 		AddCluster(
 			cluster.Define("runtime", "runtime cluster").WithFallback("dataplane"),
 			cluster.DefineFleet("dataplane", "api cluster for functional controllers", kcp.Type()).WithFallback("target"),
-			cluster.DefineFleet("source", "user api cluster", kcp.Type()).WithFallback(cluster.DEFAULT),
-			cluster.Define("target", "replication target").WithFallback("source"),
+			cluster.DefineFleet("source", "user api cluster", kcp.Type()).WithFallback("target"),
+			cluster.Define("target", "replication target").WithFallback(cluster.DEFAULT),
 		).
 		AddController(
 			hostedzone.Controller(),
@@ -66,6 +68,9 @@ func main() {
 
 			entryup.Controller(),
 			entrydown.Controller(),
+
+			zoneup.Controller(),
+			zonedown.Controller(),
 		)
 
 	options := &flagutils.DefaultOptionSet{}

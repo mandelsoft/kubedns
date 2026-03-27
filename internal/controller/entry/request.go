@@ -3,7 +3,6 @@ package entry
 import (
 	errors2 "errors"
 	"fmt"
-	"net"
 	"slices"
 
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
@@ -21,7 +20,7 @@ type ReconcileRequest struct {
 }
 
 func (r *ReconcileRequest) Reconcile() reconcile.Problem {
-	baseerr := r.Validate()
+	baseerr := common.ValidateEntryData(r.Object)
 	e := r.Object
 
 	var root *corednsv1alpha1.HostedZone
@@ -142,58 +141,6 @@ func (r *ReconcileRequest) responsibleForEntry() (*Responsibility, reconcile.Pro
 		}
 		n = objutils.RefObjectKeyFor(&zone, zone.Spec.ParentRef)
 	}
-}
-
-func (r *ReconcileRequest) Validate() error {
-	var err error
-
-	e := r.Object
-	if len(e.Spec.DNSNames) == 0 {
-		err = fmt.Errorf("no DNS names specified")
-	}
-	for _, n := range e.Spec.DNSNames {
-		_ = n
-		//  TODO: validate DNS names
-	}
-
-	for _, ips := range e.Spec.A {
-		ip := net.ParseIP(ips)
-		if ip == nil || ip.To4() == nil {
-			err = errors2.Join(err, fmt.Errorf("invalid ipv4 address %q", ips))
-		}
-	}
-
-	for _, ips := range e.Spec.AAAA {
-		ip := net.ParseIP(ips)
-		if ip == nil || ip.To4() != nil {
-			err = errors2.Join(err, fmt.Errorf("invalid ipv6 address %q", ips))
-		}
-	}
-
-	if len(e.Spec.CNAME) > 0 {
-		// TODO: validate cname
-	}
-
-	if len(e.Spec.A) == 0 && len(e.Spec.AAAA) == 0 && len(e.Spec.CNAME) == 0 && len(e.Spec.TXT) == 0 && len(e.Spec.NS) == 0 && (e.Spec.SRV == nil || len(e.Spec.SRV.Records) == 0) {
-		err = errors2.Join(err, fmt.Errorf("no record defined"))
-	}
-	if e.Spec.SRV != nil {
-		if len(e.Spec.SRV.Records) != 0 && len(e.Spec.SRV.Service) == 0 {
-			err = errors2.Join(err, fmt.Errorf("service name required for SRV record"))
-		}
-		for i, r := range e.Spec.SRV.Records {
-			if r.Protocol != "TCP" && r.Protocol != "UDP" {
-				err = errors2.Join(err, fmt.Errorf("invalid protocol %q for SRV record %d", r.Protocol, i))
-			}
-			if r.Port <= 0 {
-				err = errors2.Join(err, fmt.Errorf("invalid port for SRV record %d", i))
-			}
-			if len(r.Host) == 0 {
-				err = errors2.Join(err, fmt.Errorf("host missing for SRV record %d", i))
-			}
-		}
-	}
-	return err
 }
 
 func (r *ReconcileRequest) SetStatusCondition(condition metav1.Condition) bool {

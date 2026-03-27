@@ -87,6 +87,7 @@ func (r *ReconcileRequest[P, T]) ReconcileDeleted() reconcile.Problem {
 
 	c := cluster.GetClusterFor(s.Settings.Source, key.ClusterName)
 	if c == nil {
+		s.Options.DeleteOriginal(r.Request.Request.NamespacedName)
 		return nil
 	}
 
@@ -94,6 +95,7 @@ func (r *ReconcileRequest[P, T]) ReconcileDeleted() reconcile.Problem {
 	if err != nil {
 		if errors.IsNotFound(err) {
 			r.Info("original object already gone")
+			s.Options.DeleteOriginal(r.Request.Request.NamespacedName)
 			return nil
 		}
 		return reconcile.TemporaryProblem(err)
@@ -105,8 +107,10 @@ func (r *ReconcileRequest[P, T]) ReconcileDeleted() reconcile.Problem {
 			if err := r.Patch(r, origp, patch); err != nil {
 				return reconcile.TemporaryProblem(client.IgnoreNotFound(err))
 			}
+		} else {
+			r.Info("original still deleting")
 		}
-		r.Info("original still deleting")
+		s.Options.DeleteOriginal(r.Request.Request.NamespacedName)
 		return nil
 	}
 
@@ -115,5 +119,6 @@ func (r *ReconcileRequest[P, T]) ReconcileDeleted() reconcile.Problem {
 	if err != nil {
 		r.Error("cannot enqueue {{key}}", key)
 	}
+	s.Options.DeleteOriginal(r.Request.Request.NamespacedName)
 	return nil
 }

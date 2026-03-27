@@ -8,5 +8,5 @@ import (
 )
 
 func Controller() controller.Definition {
-	return down.Controller[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](replicate.ControllerEntry, replicate.ENTRY_GROUP)
+	return down.Controller[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone](replicate.ControllerHostedzone, replicate.HOSTEDZONE_GROUP)
 }

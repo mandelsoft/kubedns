@@ -18,7 +18,6 @@ package hostedzone
 
 import (
 	"context"
-	"slices"
 
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	. "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
@@ -28,7 +27,6 @@ import (
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/logging"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -86,34 +84,8 @@ func (r *HostedZoneReconciler) TriggerEntries(ctx context.Context, logger loggin
 	return nil
 }
 
-func (r *HostedZoneReconciler) GetRootInfo(ctx *ReconcileRequest, logger logging.Logger, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, Problem) {
-	var path string
-	var directParent *corednsv1alpha1.HostedZone
-
-	hist := []string{obj.GetName()}
-	for obj.Spec.ParentRef != "" {
-		var parent corednsv1alpha1.HostedZone
-		path = path + "/" + obj.Spec.ParentRef
-		logger.Info("handle parent", "parent", path)
-		if slices.Contains(hist, obj.Spec.ParentRef) {
-			return nil, true, Failedf("reference cyle %s", path)
-		}
-		err := ctx.Get(ctx, client.ObjectKey{Namespace: obj.GetNamespace(), Name: obj.Spec.ParentRef}, &parent)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				return nil, true, Failedf("parent %s not found", obj.Spec.ParentRef)
-			}
-			return nil, false, TemporaryProblem(err)
-		}
-		if !parent.GetDeletionTimestamp().IsZero() {
-			return nil, true, Failedf("parent %s deleted", obj.Spec.ParentRef)
-		}
-		if directParent == nil {
-			directParent = &parent
-		}
-		obj = &parent
-	}
-	return &Responsibility{Root: obj, Parent: directParent, Runtime: String(obj.Spec.Runtime, ""), RuntimeSet: obj.Spec.Runtime != nil, Class: String(obj.Spec.Class, "")}, true, nil
+func (r *HostedZoneReconciler) GetRootInfo(ctx *ReconcileRequest, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, Problem) {
+	return common.GetRootInfo(ctx, ctx, ctx, obj)
 }
 
 func ConditionStatus(b bool) metav1.ConditionStatus {

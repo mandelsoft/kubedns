@@ -20,6 +20,7 @@ type Settings struct {
 
 type ReconcileRequest[P kubecrtutils.ObjectPointer[T], T any] struct {
 	reconciler.DefaultReconcileRequest[P, *support.Reconciler[*replicate.Options, Settings, P, T]]
+	Resp ResponsibilityHandler[P, T]
 }
 
 func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
@@ -30,8 +31,17 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 
 	s := r.Reconciler
 
-	// Todo: determine zone to check class
+	if r.Resp != nil {
+		ok, prob := r.Resp.IsResponsible(r)
 
+		if prob != nil {
+			return prob
+		}
+		if !ok {
+			r.Info("handle replica deletion for being not reponsisble")
+			return r.ReconcileDeleting()
+		}
+	}
 	patch := client.MergeFrom(r.GetOrig())
 	if controllerutil.AddFinalizer(r.Object, s.Finalizer) {
 		if err := r.Patch(r, r.Object, patch); err != nil {
@@ -63,12 +73,15 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 		}
 	}
 
+	// update replica
 	newp := r.Object.DeepCopyObject().(P)
 	newp.SetNamespace(namespace)
 	objutils.CleanupMeta(newp)
 	objutils.SetAnnotation(newp, replicate.ANNOTATION, r.Cluster.GetId())
 	controllerutil.RemoveFinalizer(newp, s.Finalizer)
-
+	if r.Resp != nil {
+		r.Resp.SetResponsibility(r, newp)
+	}
 	r.Reconciler.Options.OwnerHandler.SetOwner(r.Cluster, r.Object, s.Settings.Target, newp)
 	var tgt T
 	tgtp := P(&tgt)
@@ -82,6 +95,11 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 			FieldManager: s.FieldManager,
 		})
 	} else {
+		if tgtp.GetDeletionTimestamp() != nil {
+			// complete deletion before recreation
+			r.Info("replica is deleting -> wait to be completed")
+			return nil
+		}
 		newp.SetFinalizers(tgtp.GetFinalizers())
 		status, err := objutils.GetStatusField(tgtp)
 		if err != nil {
@@ -106,7 +124,8 @@ func (r *ReconcileRequest[P, T]) ReconcileDeleting() reconcile.Problem {
 
 	var tgt T
 	tgtp := P(&tgt)
-	err := s.Settings.Target.Get(r.Context, client.ObjectKey{Name: r.Name, Namespace: namespace}, tgtp)
+	key := client.ObjectKey{Name: r.Name, Namespace: namespace}
+	err := s.Settings.Target.Get(r.Context, key, tgtp)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return reconcile.TemporaryProblem(err)
@@ -119,6 +138,7 @@ func (r *ReconcileRequest[P, T]) ReconcileDeleting() reconcile.Problem {
 				return reconcile.TemporaryProblem(client.IgnoreNotFound(err))
 			}
 		}
+		s.Options.DeleteOriginal(key)
 		return nil
 	}
 	patch := client.MergeFrom(tgtp.DeepCopyObject().(client.Object))
