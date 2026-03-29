@@ -12,17 +12,21 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/support"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate"
+	"github.com/mandelsoft/kubedns/internal/controller/replicate/common"
 )
 
+type ResponsibilityFactory[P kubecrtutils.ObjectPointer[T], T any] = func(c controller.TypedController[P, T]) (ResponsibilityHandler[P, T], error)
+
 type ResponsibilityHandler[P kubecrtutils.ObjectPointer[T], T any] interface {
+	Delete(r *ReconcileRequest[P, T])
 	IsResponsible(*ReconcileRequest[P, T]) (bool, reconcile.Problem)
 	SetResponsibility(r *ReconcileRequest[P, T], obj P)
 }
 
-func Controller[P kubecrtutils.ObjectPointer[T], T any](name, group string, resp ...ResponsibilityHandler[P, T]) controller.TypedDefinition[P, T] {
+func Controller[P kubecrtutils.ObjectPointer[T], T any](name, group string, mp common.MappingProvider, resp ...ResponsibilityFactory[P, T]) controller.TypedDefinition[P, T] {
 	r := general.Optional(resp...)
 	return controller.Define[P, T](name+".up", replicate.SOURCE,
-		support.NewByFactory[*replicate.Options, Settings, P, T](&Factory[P, T]{resp: r})).
+		support.NewByFactory[*common.Options, Settings[P, T], P, T](&Factory[P, T]{resp: r, mapprov: mp})).
 		UseCluster(replicate.TARGET).
 		WithFinalizer(name).
 		InGroup(replicate.GROUP, group).
@@ -30,26 +34,40 @@ func Controller[P kubecrtutils.ObjectPointer[T], T any](name, group string, resp
 }
 
 type Factory[P kubecrtutils.ObjectPointer[T], T any] struct {
-	resp ResponsibilityHandler[P, T]
-	replicate.Factory
+	mapprov common.MappingProvider
+	resp    ResponsibilityFactory[P, T]
+	common.Factory
 }
 
-var _ support.Factory[*replicate.Options, Settings, *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry] = (*Factory[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry])(nil)
+var _ support.Factory[*common.Options, Settings[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry], *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry] = (*Factory[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry])(nil)
 
-func (f *Factory[P, T]) CreateSettings(ctx context.Context, o *replicate.Options, c controller.TypedController[P, T]) Settings {
+func (f *Factory[P, T]) CreateSettings(ctx context.Context, o *common.Options, c controller.TypedController[P, T]) (Settings[P, T], error) {
 	tgt := c.GetClusters().Get(replicate.TARGET).AsCluster()
 	l := c.GetLogger()
 	l.Info("creating entry down replicator...")
 	l.Info("using source {{ctype}} {{cluster}}[{info}}]", "apiserver", c.GetCluster().GetTypeInfo(), c.GetCluster().GetName(), c.GetCluster().GetInfo())
 	l.Info("using target {{ctype}} {{cluster}}[{info}}]", "apiserver", tgt.GetTypeInfo(), tgt.GetName(), tgt.GetInfo())
-	return Settings{
-		Target: tgt,
+
+	var resp ResponsibilityHandler[P, T]
+	var err error
+	if f.resp != nil {
+		resp, err = f.resp(c)
+		if err != nil {
+			return Settings[P, T]{}, err
+		}
 	}
+	return Settings[P, T]{
+		Target:  tgt,
+		Mapping: f.mapprov.GetMapping(o),
+		Resp:    resp,
+	}, nil
 }
 
-func (f *Factory[P, T]) CreateRequest(def *reconciler.BaseRequest[P], r *support.Reconciler[*replicate.Options, Settings, P, T]) reconciler.ReconcileRequest[P] {
-	return &ReconcileRequest[P, T]{
-		DefaultReconcileRequest: reconciler.DefaultReconcileRequest[P, *support.Reconciler[*replicate.Options, Settings, P, T]]{*def, r},
-		Resp:                    f.resp,
+func (f *Factory[P, T]) CreateRequest(def *reconciler.BaseRequest[P], r *support.Reconciler[*common.Options, Settings[P, T], P, T]) reconciler.ReconcileRequest[P] {
+	req := &ReconcileRequest[P, T]{
+		DefaultReconcileRequest: reconciler.DefaultReconcileRequest[P, *support.Reconciler[*common.Options, Settings[P, T], P, T]]{*def, r},
 	}
+	req.MappingContext = common.WithCluster(req, r.Settings.Target)
+	return req
+
 }

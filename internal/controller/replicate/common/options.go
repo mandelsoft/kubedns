@@ -1,17 +1,15 @@
-package replicate
+package common
 
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
+	"github.com/mandelsoft/kubedns/internal/controller/replicate"
 	"github.com/spf13/pflag"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
 type Options struct {
@@ -20,8 +18,7 @@ type Options struct {
 	TargetNamespace string
 
 	OwnerHandler owner.Handler
-	lock         sync.RWMutex
-	index        map[client.ObjectKey]mcreconcile.Request
+	*ReplicationMapping
 }
 
 func From(opts flagutils.OptionSetProvider) *Options {
@@ -33,7 +30,7 @@ var (
 )
 
 func New() *Options {
-	return &Options{index: map[client.ObjectKey]mcreconcile.Request{}}
+	return &Options{ReplicationMapping: NewReplicationMapping()}
 }
 
 func (o *Options) Prepare(ctx context.Context, opts flagutils.OptionSet, v flagutils.PreparationSet) error {
@@ -47,11 +44,11 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 	if err != nil {
 		return err
 	}
-	if clusters.Get(SOURCE) == nil {
-		return fmt.Errorf("%s cluster is required", SOURCE)
+	if clusters.Get(replicate.SOURCE) == nil {
+		return fmt.Errorf("%s cluster is required", replicate.SOURCE)
 	}
-	if clusters.Get(TARGET) == nil {
-		return fmt.Errorf("% cluster is required", TARGET)
+	if clusters.Get(replicate.TARGET) == nil {
+		return fmt.Errorf("% cluster is required", replicate.TARGET)
 	}
 
 	com, err := flagutils.ValidatedOptions[*common.Options](ctx, opts, v)
@@ -60,35 +57,13 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 	}
 	o.Class = com.Class
 
-	o.OwnerHandler = owner.NewHandler(clusters.Get(TARGET))
+	o.OwnerHandler = owner.NewHandler(clusters.Get(replicate.TARGET))
 	return nil
 }
 
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&o.TargetNamespace, "target-namespace", "", "", "namespace used to request nameserver DNS names")
 	fs.StringVarP(&o.TargetClass, "target-class", "", "", "target class for replication")
-}
-
-func (o *Options) GetOriginal(key client.ObjectKey) *mcreconcile.Request {
-	o.lock.RLock()
-	defer o.lock.RUnlock()
-	r, ok := o.index[key]
-	if !ok {
-		return nil
-	}
-	return &r
-}
-
-func (o *Options) SetOriginal(key client.ObjectKey, tgt mcreconcile.Request) {
-	o.lock.Lock()
-	defer o.lock.Unlock()
-	o.index[key] = tgt
-}
-
-func (o *Options) DeleteOriginal(key client.ObjectKey) {
-	o.lock.Lock()
-	defer o.lock.Unlock()
-	delete(o.index, key)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

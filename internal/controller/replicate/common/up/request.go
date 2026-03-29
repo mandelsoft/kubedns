@@ -8,19 +8,21 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/support"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate"
-	v1 "k8s.io/api/core/v1"
+	"github.com/mandelsoft/kubedns/internal/controller/replicate/common"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-type Settings struct {
-	Target cluster.Cluster
+type Settings[P kubecrtutils.ObjectPointer[T], T any] struct {
+	Target  cluster.Cluster
+	Mapping common.Mapping
+	Resp    ResponsibilityHandler[P, T]
 }
 
 type ReconcileRequest[P kubecrtutils.ObjectPointer[T], T any] struct {
-	reconciler.DefaultReconcileRequest[P, *support.Reconciler[*replicate.Options, Settings, P, T]]
-	Resp ResponsibilityHandler[P, T]
+	reconciler.DefaultReconcileRequest[P, *support.Reconciler[*common.Options, Settings[P, T], P, T]]
+	MappingContext common.Context
 }
 
 func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
@@ -28,22 +30,25 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 		r.Info("skip replicated object")
 		return nil
 	}
+	s := r.Reconciler.Settings
 
-	s := r.Reconciler
+	if s.Resp != nil {
+		ok, prob := s.Resp.IsResponsible(r)
 
-	if r.Resp != nil {
-		ok, prob := r.Resp.IsResponsible(r)
-
+		if !ok {
+			r.Info("handle replica deletion for being not reponsible")
+			p := r.ReconcileDeleting()
+			if p != nil {
+				return p
+			}
+			return prob
+		}
 		if prob != nil {
 			return prob
 		}
-		if !ok {
-			r.Info("handle replica deletion for being not reponsisble")
-			return r.ReconcileDeleting()
-		}
 	}
 	patch := client.MergeFrom(r.GetOrig())
-	if controllerutil.AddFinalizer(r.Object, s.Finalizer) {
+	if controllerutil.AddFinalizer(r.Object, r.Reconciler.Finalizer) {
 		if err := r.Patch(r, r.Object, patch); err != nil {
 			return reconcile.TemporaryProblem(client.IgnoreNotFound(err))
 		}
@@ -56,21 +61,9 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 		Name:      r.Name,
 		Namespace: namespace,
 	}
-	s.Options.SetOriginal(key, r.Request)
-
-	var ns v1.Namespace
-	err := s.Settings.Target.Get(r, client.ObjectKey{Name: namespace}, &ns)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			r.Info("assure target namespace", "namespace", namespace)
-			ns.Name = namespace
-			err = s.Settings.Target.Create(r, &ns, &client.CreateOptions{
-				FieldManager: s.FieldManager,
-			})
-		}
-		if err != nil {
-			return reconcile.TemporaryProblem(err)
-		}
+	prob := s.Mapping.SetOriginal(r.MappingContext, key, r.Request)
+	if prob != nil {
+		return prob
 	}
 
 	// update replica
@@ -78,21 +71,24 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 	newp.SetNamespace(namespace)
 	objutils.CleanupMeta(newp)
 	objutils.SetAnnotation(newp, replicate.ANNOTATION, r.Cluster.GetId())
-	controllerutil.RemoveFinalizer(newp, s.Finalizer)
-	if r.Resp != nil {
-		r.Resp.SetResponsibility(r, newp)
+	controllerutil.RemoveFinalizer(newp, r.Reconciler.Finalizer)
+	if s.Resp != nil {
+		s.Resp.SetResponsibility(r, newp)
 	}
-	r.Reconciler.Options.OwnerHandler.SetOwner(r.Cluster, r.Object, s.Settings.Target, newp)
+	err := r.Reconciler.Options.OwnerHandler.SetOwner(r.Cluster, r.Object, s.Target, newp)
+	if err != nil {
+		return reconcile.TemporaryProblem(err)
+	}
 	var tgt T
 	tgtp := P(&tgt)
-	err = s.Settings.Target.Get(r.Context, key, tgtp)
+	err = s.Target.Get(r.Context, key, tgtp)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return reconcile.TemporaryProblem(err)
 		}
 		r.Info("create in target")
-		err = s.Settings.Target.Create(r.Context, newp, &client.CreateOptions{
-			FieldManager: s.FieldManager,
+		err = s.Target.Create(r.Context, newp, &client.CreateOptions{
+			FieldManager: r.Reconciler.FieldManager,
 		})
 	} else {
 		if tgtp.GetDeletionTimestamp() != nil {
@@ -113,46 +109,49 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 		}
 
 		// pass s.FieldManager to patch only managed fields
-		_, err = cluster.ClientSideApplyObject(s.Settings.Target, cluster.DefaultOperationContext(r, r, ""), newp, tgtp)
+		_, err = cluster.ClientSideApplyObject(s.Target, cluster.DefaultOperationContext(r, r, ""), newp, tgtp)
 	}
 	return reconcile.TemporaryProblem(client.IgnoreNotFound(err))
 }
 
 func (r *ReconcileRequest[P, T]) ReconcileDeleting() reconcile.Problem {
 	namespace := objutils.GenerateUniqueName("replica", r.Cluster.GetId(), r.Reconciler.Options.TargetNamespace, r.Namespace, objutils.MAX_NAMESPACELEN)
-	s := r.Reconciler
+	s := r.Reconciler.Settings
 
 	var tgt T
 	tgtp := P(&tgt)
 	key := client.ObjectKey{Name: r.Name, Namespace: namespace}
-	err := s.Settings.Target.Get(r.Context, key, tgtp)
+	err := s.Target.Get(r.Context, key, tgtp)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return reconcile.TemporaryProblem(err)
 		}
 		r.Info("replica already deleted")
 		patch := client.MergeFrom(r.GetOrig())
-		if controllerutil.RemoveFinalizer(r.Object, s.Finalizer) {
+		if controllerutil.RemoveFinalizer(r.Object, r.Reconciler.Finalizer) {
 			r.Info("releasing responsibility")
 			if err := r.Patch(r, r.Object, patch); err != nil {
 				return reconcile.TemporaryProblem(client.IgnoreNotFound(err))
 			}
 		}
-		s.Options.DeleteOriginal(key)
-		return nil
+		return s.Mapping.RemoveOriginal(r.MappingContext, key)
 	}
 	patch := client.MergeFrom(tgtp.DeepCopyObject().(client.Object))
-	if controllerutil.RemoveFinalizer(tgtp, s.Finalizer) {
+	if controllerutil.RemoveFinalizer(tgtp, r.Reconciler.Finalizer) {
 		r.Info("removing finalizer from replica")
 		if err := r.Patch(r, tgtp, patch); err != nil {
 			return reconcile.TemporaryProblem(client.IgnoreNotFound(err))
 		}
 	}
+
+	if s.Resp != nil {
+		defer s.Resp.Delete(r)
+	}
 	if tgtp.GetDeletionTimestamp() != nil {
 		r.Info("replica already deleting")
 	} else {
 		r.Info("request replica deletion")
-		return reconcile.TemporaryProblem(s.Settings.Target.Delete(r.Context, tgtp))
+		return reconcile.TemporaryProblem(s.Target.Delete(r.Context, tgtp))
 	}
 	return nil
 }

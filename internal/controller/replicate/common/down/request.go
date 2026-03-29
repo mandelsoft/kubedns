@@ -9,17 +9,20 @@ import (
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate"
+	"github.com/mandelsoft/kubedns/internal/controller/replicate/common"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type Settings struct {
-	Source cluster.ClusterEquivalent
+	Source  cluster.ClusterEquivalent
+	Mapping common.Mapping
 }
 
 type ReconcileRequest[P kubecrtutils.ObjectPointer[T], T any] struct {
-	reconciler.DefaultReconcileRequest[P, *support.Reconciler[*replicate.Options, Settings, P, T]]
+	MappingContext common.Context
+	reconciler.DefaultReconcileRequest[P, *support.Reconciler[*common.Options, Settings, P, T]]
 }
 
 func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
@@ -73,36 +76,34 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 }
 
 func (r *ReconcileRequest[P, T]) ReconcileDeleted() reconcile.Problem {
-	key := r.Reconciler.Options.GetOriginal(r.Request.Request.NamespacedName)
+	key := r.Reconciler.Settings.Mapping.GetOriginal(r.Request.Request.NamespacedName)
 	if key == nil {
 		return nil
 	}
 
-	s := r.Reconciler
+	s := r.Reconciler.Settings
 
 	r.Info("found source {{source}} for deleted object", "source", *key)
 
 	var orig T
 	origp := P(&orig)
 
-	c := cluster.GetClusterFor(s.Settings.Source, key.ClusterName)
+	c := cluster.GetClusterFor(s.Source, key.ClusterName)
 	if c == nil {
-		s.Options.DeleteOriginal(r.Request.Request.NamespacedName)
-		return nil
+		return s.Mapping.RemoveOriginal(r.MappingContext, r.Request.Request.NamespacedName)
 	}
 
 	err := c.Get(r, key.NamespacedName, origp)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			r.Info("original object already gone")
-			s.Options.DeleteOriginal(r.Request.Request.NamespacedName)
-			return nil
+			return s.Mapping.RemoveOriginal(r, r.Request.Request.NamespacedName)
 		}
 		return reconcile.TemporaryProblem(err)
 	}
 	if origp.GetDeletionTimestamp() != nil {
 		patch := client.MergeFrom(origp.DeepCopyObject().(client.Object))
-		if controllerutil.RemoveFinalizer(origp, s.Finalizer) {
+		if controllerutil.RemoveFinalizer(origp, r.Reconciler.Finalizer) {
 			r.Info("original still deleting -> remove finalizer")
 			if err := r.Patch(r, origp, patch); err != nil {
 				return reconcile.TemporaryProblem(client.IgnoreNotFound(err))
@@ -110,8 +111,7 @@ func (r *ReconcileRequest[P, T]) ReconcileDeleted() reconcile.Problem {
 		} else {
 			r.Info("original still deleting")
 		}
-		s.Options.DeleteOriginal(r.Request.Request.NamespacedName)
-		return nil
+		return s.Mapping.RemoveOriginal(r, r.Request.Request.NamespacedName)
 	}
 
 	r.Info("original object still valid -> trigger recreation")
@@ -119,6 +119,5 @@ func (r *ReconcileRequest[P, T]) ReconcileDeleted() reconcile.Problem {
 	if err != nil {
 		r.Error("cannot enqueue {{key}}", key)
 	}
-	s.Options.DeleteOriginal(r.Request.Request.NamespacedName)
-	return nil
+	return s.Mapping.RemoveOriginal(r, r.Request.Request.NamespacedName)
 }

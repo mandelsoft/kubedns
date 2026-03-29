@@ -6,6 +6,7 @@ import (
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate"
+	common2 "github.com/mandelsoft/kubedns/internal/controller/replicate/common"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate/common/up"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,24 +16,36 @@ func Controller() controller.Definition {
 	return up.Controller[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](
 		replicate.ControllerEntry,
 		replicate.ENTRY_GROUP,
-		Handler{},
+		common2.ProviderFunc(GetMapping),
+		NewHandler,
 	)
+}
+
+func GetMapping(o *common2.Options) common2.Mapping {
+	return o.Entries
+}
+
+func NewHandler(c controller.TypedController[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry]) (up.ResponsibilityHandler[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry], error) {
+	return &Handler{}, nil
 }
 
 type Handler struct {
 }
 
-func (h Handler) SetStatusCondition(obj *corednsv1alpha1.CoreDNSEntry, condition metav1.Condition) bool {
+func (h *Handler) Delete(r *up.ReconcileRequest[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry]) {
+}
+
+func (h *Handler) SetStatusCondition(obj *corednsv1alpha1.CoreDNSEntry, condition metav1.Condition) bool {
 	if condition.ObservedGeneration == 0 {
 		condition.ObservedGeneration = obj.GetGeneration()
 	}
 	return meta.SetStatusCondition(&obj.Status.Conditions, condition)
 }
 
-func (h Handler) SetResponsibility(r *up.ReconcileRequest[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry], obj *corednsv1alpha1.CoreDNSEntry) {
+func (h *Handler) SetResponsibility(r *up.ReconcileRequest[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry], obj *corednsv1alpha1.CoreDNSEntry) {
 }
 
-func (h Handler) IsResponsible(r *up.ReconcileRequest[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry]) (bool, reconcile.Problem) {
+func (h *Handler) IsResponsible(r *up.ReconcileRequest[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry]) (bool, reconcile.Problem) {
 	info, err, prob := common.ValidateEntry(r, r, r, r.Object)
 
 	if prob != nil {
@@ -59,7 +72,7 @@ func (h Handler) IsResponsible(r *up.ReconcileRequest[*corednsv1alpha1.CoreDNSEn
 			})
 			r.Object.Status.State = "Problem"
 			r.Object.Status.Message = err.Error()
-			return true, reconcile.Failed(err)
+			return false, reconcile.Failed(err)
 		} else {
 			r.Info("configuration problem propagated up stream: {{problem}}", "problem", err)
 		}
