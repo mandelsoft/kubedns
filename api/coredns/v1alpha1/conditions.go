@@ -8,6 +8,7 @@ const ReasonConfigurarationInvalid = "ConfigurationInvalid"
 
 const ReasonDomainNameMissing = "DomainNameMissing"
 const ReasonEMailMissing = "EMailMissing"
+const ReasonEMailInvalid = "EMailInvalid"
 const ReasonExpireMissing = "ExpireMissing"
 const ReasonTTLMissing = "TTLMissing"
 const ReasonInvalidFormat = "InvalidFieldFormat"

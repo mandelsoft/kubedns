@@ -14,18 +14,29 @@ import (
 )
 
 type Responsibility struct {
-	Root       *corednsv1alpha1.HostedZone
-	Parent     *corednsv1alpha1.HostedZone
-	RuntimeSet bool
-	Runtime    string
-	Class      string
+	Root    *corednsv1alpha1.HostedZone
+	Parent  *corednsv1alpha1.HostedZone
+	Runtime *string
+	Class   string
 }
 
 func (r *Responsibility) String() string {
 	if r == nil {
 		return "no info"
 	}
-	return fmt.Sprintf("root %q, parent %q, runtime: %q, class: %q", r.Root.Name, r.Parent.Name, r.Runtime, r.Class)
+	return fmt.Sprintf("root %q, parent %q, runtime: %q, class: %q", r.Root.Name, r.Parent.Name, String(r.Runtime, "<none>"), r.Class)
+}
+
+func (r *Responsibility) Check(class string, runtime *string) bool {
+	if r.Class != class {
+		return false
+	}
+	if r.Runtime != nil {
+		if runtime == nil || *r.Runtime != *runtime {
+			return false
+		}
+	}
+	return false
 }
 
 func GetRootInfoForEntry(ctx context.Context, c cluster.Cluster, logger logging.Logger, n client.ObjectKey) (*Responsibility, bool, reconcile.Problem) {
@@ -58,8 +69,7 @@ func GetRootInfoForEntry(ctx context.Context, c cluster.Cluster, logger logging.
 		hist = append(hist, zone)
 		zone = parent.Spec.ParentRef
 	}
-	resp.Runtime = String(resp.Root.Spec.Runtime, "")
-	resp.RuntimeSet = resp.Root.Spec.Runtime != nil
+	resp.Runtime = resp.Root.Spec.Runtime
 	resp.Class = String(resp.Root.Spec.Class, "")
 	return &resp, true, nil
 }
@@ -92,5 +102,5 @@ func GetRootInfo(ctx context.Context, c cluster.Cluster, logger logging.Logger, 
 		hist = append(hist, obj.Spec.ParentRef)
 		obj = &parent
 	}
-	return &Responsibility{Root: obj, Parent: directParent, Runtime: String(obj.Spec.Runtime, ""), RuntimeSet: obj.Spec.Runtime != nil, Class: String(obj.Spec.Class, "")}, true, nil
+	return &Responsibility{Root: obj, Parent: directParent, Runtime: obj.Spec.Runtime, Class: String(obj.Spec.Class, "")}, true, nil
 }

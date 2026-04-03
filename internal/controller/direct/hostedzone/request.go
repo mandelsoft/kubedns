@@ -220,13 +220,13 @@ func (r *ReconcileRequest) IsResponsibile() (bool, *Responsibility, Problem) {
 		return true, info, nil
 
 	}
-	new := info.Runtime == r.Reconciler.Options.Runtime && info.Class == r.Reconciler.Options.Class
+	new := info.Check(r.Reconciler.Options.Class, r.Reconciler.Options.Runtime)
 	r.Info("checking match: {{match}}", "match", new)
 	if info.Root.Status.Observed == nil {
 		return new, info, nil
 	}
 
-	match := info.Root.Status.Observed.Class == r.Reconciler.Options.Class && info.Root.Status.Observed.Runtime == r.Reconciler.Options.Runtime
+	match := info.Root.Status.Observed.Class == r.Reconciler.Options.Class && info.Root.Status.Observed.Runtime == String(r.Reconciler.Options.Runtime, "")
 	r.Info("checking registered match for class {{observed}}: {{match}}", "match", new, "observed", info.Root.Status.Observed.Class)
 	return match, info, nil
 
@@ -252,7 +252,7 @@ func (r *ReconcileRequest) handleObject(root *Responsibility) Problem {
 		if observed == nil {
 			r.Info("registering responsibility")
 			observed = &corednsv1alpha1.Observed{
-				Runtime: r.Reconciler.Options.Runtime,
+				Runtime: String(r.Reconciler.Options.Runtime, ""),
 				Class:   r.Reconciler.Options.Class,
 			}
 		}

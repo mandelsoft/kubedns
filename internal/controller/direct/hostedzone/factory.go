@@ -10,7 +10,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/index"
 	"github.com/mandelsoft/kubecrtutils/objutils/objfilter"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/internal/controller/common"
+	"github.com/mandelsoft/kubedns/internal/controller/direct/common"
 	crtreconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -41,8 +41,8 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 	if r.Options.Class != "" {
 		r.FieldManager += "-" + r.Options.Class
 	}
-	if r.Options.Runtime != "" {
-		r.FieldManager += "--" + r.Options.Runtime
+	if r.Options.Runtime != nil && *r.Options.Runtime != "" {
+		r.FieldManager += "--" + *r.Options.Runtime
 	}
 	r.Finalizer = r.FieldManager
 

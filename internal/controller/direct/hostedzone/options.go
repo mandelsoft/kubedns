@@ -15,7 +15,7 @@ import (
 )
 
 type Options struct {
-	Runtime          string
+	Runtime          *string
 	Class            string
 	DNSClass         string
 	DNSDomain        string
@@ -53,6 +53,7 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 		return fmt.Errorf("class option not found in option definitions")
 	}
 	o.Class = copt.Class
+	o.Runtime = copt.Runtime
 	clusters, err := cluster.ValidatedClusters(ctx, opts, v)
 	if err != nil {
 		return err
@@ -71,7 +72,6 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	modes := DNSModes.Names()
 	fs.StringVarP(&o.RuntimeNamespace, "runtime-namespace", "", "", "use single runtime namespace for deployments")
-	fs.StringVarP(&o.Runtime, "runtime", "", "", "name of the runtime class to handle")
 
 	fs.StringVarP(&o.DNSMode, "dns-mode", "", "loadbalancer", fmt.Sprintf("DNS mode for providing nameserver cnames [%s]", strings.Join(modes, ",")))
 	fs.StringVarP(&o.DNSDomain, "dns-domain", "", "", "DNS domain for managed nameserver DNS names")
@@ -81,8 +81,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *Options) Configure(ctx context.Context, cfg *manager.Options, opts flagutils.OptionSet) error {
-	if o.Runtime != "" {
-		cfg.LeaderElectionID = o.Runtime + "-" + cfg.LeaderElectionID
+	if o.Runtime != nil && *o.Runtime != "" {
+		cfg.LeaderElectionID = *o.Runtime + "-" + cfg.LeaderElectionID
 	}
 	if o.Class != "" {
 		cfg.LeaderElectionID = o.Class + "-" + cfg.LeaderElectionID

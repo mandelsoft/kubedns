@@ -5,6 +5,7 @@ import (
 	errors2 "errors"
 	"fmt"
 	"net"
+	"net/mail"
 
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
@@ -91,4 +92,38 @@ func ValidateEntry(ctx context.Context, c cluster.Cluster, logger logging.Logger
 		logger.Info("found problem {{error}}", "error", baseerr)
 	}
 	return resp, baseerr, nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+func ValidateZone(e *corednsv1alpha1.HostedZone) (string, error) {
+	var err error
+
+	if len(e.Spec.DomainNames) == 0 {
+		return corednsv1alpha1.ReasonDomainNameMissing, fmt.Errorf("at least one domain name required")
+	}
+	if e.Spec.EMail == "" {
+		return corednsv1alpha1.ReasonEMailMissing, fmt.Errorf("email address required")
+	}
+	_, err = mail.ParseAddress(e.Spec.EMail)
+	if err != nil {
+		return corednsv1alpha1.ReasonEMailInvalid, err
+	}
+	if e.Spec.Expire == 0 {
+		return corednsv1alpha1.ReasonExpireMissing, fmt.Errorf("expire required")
+	}
+	if e.Spec.Refresh == 0 || e.Spec.Retry == 0 || e.Spec.MinimumTTL == 0 {
+		return corednsv1alpha1.ReasonTTLMissing, fmt.Errorf("refresh, retry or minimumTTL required")
+	}
+
+	if e.Spec.ParentRef != "" {
+		if e.Spec.Runtime != nil {
+			return corednsv1alpha1.ReasonInvalidNesting, fmt.Errorf("runtime set for nested zone")
+		}
+		if e.Spec.Class != nil {
+			return corednsv1alpha1.ReasonInvalidNesting, fmt.Errorf("class set for nested zone")
+		}
+	}
+
+	return "", err
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/objutils/objfilter"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
+	common2 "github.com/mandelsoft/kubedns/internal/controller/direct/common"
 	"github.com/mandelsoft/logging"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,7 +34,7 @@ import (
 
 // HostedZoneReconciler reconciles a HostedZone object
 type HostedZoneReconciler struct {
-	*common.Reconciler
+	*common2.Reconciler
 	Mode      Mode
 	Finalizer string
 

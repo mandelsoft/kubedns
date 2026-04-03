@@ -2,11 +2,13 @@ package common
 
 import (
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/flagutils/pflags"
 	"github.com/spf13/pflag"
 )
 
 type Options struct {
-	Class string
+	Class   string
+	Runtime *string
 }
 
 func From(opts flagutils.OptionSetProvider) *Options {
@@ -23,6 +25,7 @@ func NewOptions() *Options {
 
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&o.Class, "class", "", "", "name of the controller class to handle")
+	pflags.StringRefVarP(fs, &o.Runtime, "runtime", "", nil, "name of the runtime to handle")
 }
 
 func Assure(opts flagutils.OptionSet) error {

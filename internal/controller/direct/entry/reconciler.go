@@ -23,8 +23,8 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/internal/controller/common"
-	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
+	"github.com/mandelsoft/kubedns/internal/controller/direct/common"
+	hostedzone2 "github.com/mandelsoft/kubedns/internal/controller/direct/hostedzone"
 	crtreconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -37,7 +37,7 @@ import (
 // then executes the reconciliation tasks.
 type CoreDNSEntryReconciler struct {
 	*common.Reconciler
-	Options *hostedzone.Options
+	Options *hostedzone2.Options
 }
 
 func (r *CoreDNSEntryReconciler) Request(def *reconciler.BaseRequest[*corednsv1alpha1.CoreDNSEntry]) reconciler.ReconcileRequest[*corednsv1alpha1.CoreDNSEntry] {
@@ -57,7 +57,7 @@ func CreateReconciler(ctx context.Context, controller controller.TypedController
 
 	r := &CoreDNSEntryReconciler{
 		Reconciler: base,
-		Options:    &d.GetOptions().(*hostedzone.ReconcilerFactory).Options,
+		Options:    &d.GetOptions().(*hostedzone2.ReconcilerFactory).Options,
 	}
 	r.Info("using dataplane cluster", "apiserver", controller.GetCluster().GetInfo())
 	return reconciler.CRTReconcilerFor[*corednsv1alpha1.CoreDNSEntry](controller, r, 0), nil

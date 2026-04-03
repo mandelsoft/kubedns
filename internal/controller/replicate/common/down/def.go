@@ -33,8 +33,8 @@ func (f Factory[P, T]) CreateSettings(ctx context.Context, o *common.Options, c 
 	src := c.GetClusters().Get(replicate.SOURCE)
 	l := c.GetLogger()
 	l.Info("creating entry down replicator...")
-	l.Info("using source {{ctype}} {{cluster}}[{info}}]", "apiserver", src.GetTypeInfo(), src.GetName(), src.GetInfo())
-	l.Info("using target {{ctype}} {{cluster}}[{info}}]", "apiserver", c.GetCluster().GetTypeInfo(), c.GetCluster().GetName(), c.GetCluster().GetInfo())
+	l.Info("using source {{ctype}} {{cluster}}[{{info}}]", "ctype", src.GetTypeInfo(), "cluster", src.GetName(), "info", src.GetInfo())
+	l.Info("using target {{ctype}} {{cluster}}[{{info}}]", "ctype", c.GetCluster().GetTypeInfo(), "cluster", c.GetCluster().GetName(), "info", c.GetCluster().GetInfo())
 	return Settings{
 		Source:  src,
 		Mapping: f.mapprov.GetMapping(o),

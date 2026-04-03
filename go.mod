@@ -7,11 +7,12 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/kcp-dev/sdk v0.30.0
 	github.com/lestrrat-go/jwx/v2 v2.1.6
-	github.com/mandelsoft/flagutils v0.0.0-20260325180552-f7ecf280b715
-	github.com/mandelsoft/goutils v0.0.0-20260226120828-1ef06f3d9aa1
+	github.com/mandelsoft/flagutils v0.0.0-20260329130458-d5b113d3e248
+	github.com/mandelsoft/goutils v0.0.0-20260403134733-619dbccc5bdb
 	github.com/mandelsoft/kubecrtutils v0.0.0-20260325101220-db841a30ce37
 	github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4
 	github.com/mandelsoft/spiff v1.3.0-beta-7.0.20251217160149-636218617943
+	github.com/miekg/dns v1.1.72
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
 	github.com/spf13/pflag v1.0.10
@@ -19,6 +20,7 @@ require (
 	k8s.io/apimachinery v0.35.0
 	k8s.io/client-go v0.35.0
 	sigs.k8s.io/controller-runtime v0.23.1
+	sigs.k8s.io/multicluster-runtime v0.23.1
 )
 
 require (
@@ -31,6 +33,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
+	github.com/drone/envsubst v1.0.3 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -122,7 +125,6 @@ require (
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
-	sigs.k8s.io/multicluster-runtime v0.23.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect

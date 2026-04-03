@@ -25,7 +25,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/handler"
 	"github.com/mandelsoft/kubecrtutils/types"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/internal/controller/common"
+	"github.com/mandelsoft/kubedns/internal/controller/direct/common"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"

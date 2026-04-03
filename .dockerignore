@@ -7,7 +7,7 @@
 **/*_test.go
 
 # Re-include yaml templates
-!internal/controller/hostedzone/assets/**
+!internal/controller/direct/hostedzone/assets/**
 
 # Re-include Go module files
 !go.mod

@@ -45,8 +45,8 @@ func (f *Factory[P, T]) CreateSettings(ctx context.Context, o *common.Options, c
 	tgt := c.GetClusters().Get(replicate.TARGET).AsCluster()
 	l := c.GetLogger()
 	l.Info("creating entry down replicator...")
-	l.Info("using source {{ctype}} {{cluster}}[{info}}]", "apiserver", c.GetCluster().GetTypeInfo(), c.GetCluster().GetName(), c.GetCluster().GetInfo())
-	l.Info("using target {{ctype}} {{cluster}}[{info}}]", "apiserver", tgt.GetTypeInfo(), tgt.GetName(), tgt.GetInfo())
+	l.Info("using source {{ctype}} {{cluster}}[{{info}}]", "ctype", c.GetCluster().GetTypeInfo(), "cluster", c.GetCluster().GetName(), "info", c.GetCluster().GetInfo())
+	l.Info("using target {{ctype}} {{cluster}}[{{info}}]", "ctype", tgt.GetTypeInfo(), "cluster", tgt.GetName(), "info", tgt.GetInfo())
 
 	var resp ResponsibilityHandler[P, T]
 	var err error

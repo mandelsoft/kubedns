@@ -14,10 +14,15 @@ import (
 	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
 	"github.com/mandelsoft/kubecrtutils/options/mlogopts"
 	"github.com/mandelsoft/kubecrtutils/setup"
+	"github.com/mandelsoft/kubedns/internal/controller/direct/entry"
+	hostedzone2 "github.com/mandelsoft/kubedns/internal/controller/direct/hostedzone"
 	entrydown "github.com/mandelsoft/kubedns/internal/controller/replicate/entry/down"
 	entryup "github.com/mandelsoft/kubedns/internal/controller/replicate/entry/up"
 	zonedown "github.com/mandelsoft/kubedns/internal/controller/replicate/hostedzone/down"
 	zoneup "github.com/mandelsoft/kubedns/internal/controller/replicate/hostedzone/up"
+	"github.com/mandelsoft/kubedns/internal/controller/server/component"
+	srventry "github.com/mandelsoft/kubedns/internal/controller/server/entry"
+	srvzone "github.com/mandelsoft/kubedns/internal/controller/server/hostedzone"
 	"github.com/spf13/pflag"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -29,8 +34,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/internal/controller/entry"
-	"github.com/mandelsoft/kubedns/internal/controller/hostedzone"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -51,8 +54,8 @@ func init() {
 // nolint:gocyclo
 func main() {
 
-	setup.ExitIfErr(hostedzone.TestRenderManifests(setup.Log), "problems with included manifests")
-	setup.ExitIfErr(hostedzone.TestRenderKubeDNSManifests(setup.Log), "problems with included dns manifests")
+	setup.ExitIfErr(hostedzone2.TestRenderManifests(setup.Log), "problems with included manifests")
+	setup.ExitIfErr(hostedzone2.TestRenderKubeDNSManifests(setup.Log), "problems with included dns manifests")
 
 	def := ctrlmgmt.Define(corednsv1alpha1.GroupVersion.Group, "source").
 		WithScheme(scheme).
@@ -63,7 +66,7 @@ func main() {
 			cluster.Define("target", "replication target").WithFallback(cluster.DEFAULT),
 		).
 		AddController(
-			hostedzone.Controller(),
+			hostedzone2.Controller(),
 			entry.Controller(),
 
 			entryup.Controller(),
@@ -71,6 +74,12 @@ func main() {
 
 			zoneup.Controller(),
 			zonedown.Controller(),
+
+			srventry.Controller(),
+			srvzone.Controller(),
+		).
+		AddComponent(
+			component.Server(),
 		)
 
 	options := &flagutils.DefaultOptionSet{}
