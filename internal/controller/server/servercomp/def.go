@@ -1,15 +1,13 @@
-package component
+package servercomp
 
 import (
 	"context"
 
 	"github.com/mandelsoft/goutils/sliceutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
-	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/component"
 	"github.com/mandelsoft/kubecrtutils/types"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/internal/controller/replicate"
 	"github.com/mandelsoft/kubedns/internal/controller/server"
 	"github.com/mandelsoft/kubedns/internal/controller/server/zonemodel"
 	"github.com/mandelsoft/logging"
@@ -60,13 +58,13 @@ func (f *Factory) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&f.port, "dnsapi", "", ":8085", "The port on which to run the DNS API server.")
 }
 
-func (f *Factory) Apply(ctx context.Context, def component.Definition, clusters cluster.Clusters, indices cacheindex.Indices, logger logging.Logger) (component.Component, error) {
+func (f *Factory) Apply(ctx context.Context, base *component.Base) (component.Component, error) {
 	c := &Component{
-		cluster:   clusters.Get(replicate.TARGET),
-		index:     indices.Get(INDEX).(cacheindex.TypedIndex[corednsv1alpha1.CoreDNSEntry]),
-		WebServer: NewWebServer(f.port, logger),
+		Base:      base,
+		cluster:   base.GetCluster(server.CLUSTER),
+		index:     cacheindex.GetTypedIndex[corednsv1alpha1.CoreDNSEntry](base.GetIndices(), INDEX),
+		WebServer: NewWebServer(f.port, base),
 	}
-	c.Base = component.NewBase(def, c)
 	c.model = zonemodel.New(c)
 	c.WebServer.AddEndpoint("/api/v1/zones/", c.handle)
 	return c, nil

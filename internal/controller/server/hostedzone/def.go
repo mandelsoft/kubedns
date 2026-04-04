@@ -9,7 +9,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/support"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/server"
-	"github.com/mandelsoft/kubedns/internal/controller/server/component"
+	"github.com/mandelsoft/kubedns/internal/controller/server/servercomp"
 	"github.com/mandelsoft/kubedns/internal/controller/server/zonemodel"
 )
 
@@ -31,7 +31,7 @@ type Factory struct {
 
 func (f *Factory) CreateSettings(ctx context.Context, o support.None, controller controller.TypedController[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone]) (*Settings, error) {
 	return &Settings{
-		model: controller.GetComponents().Get(server.Component).(*component.Component).GetModel(),
+		model: controller.GetComponents().Get(server.Component).(*servercomp.Component).GetModel(),
 	}, nil
 }
 

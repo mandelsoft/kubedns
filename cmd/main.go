@@ -9,6 +9,7 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet/kcp"
+	"github.com/mandelsoft/kubecrtutils/component"
 	"github.com/mandelsoft/kubecrtutils/ctrlmgmt"
 	"github.com/mandelsoft/kubecrtutils/options/activationopts"
 	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
@@ -20,9 +21,9 @@ import (
 	entryup "github.com/mandelsoft/kubedns/internal/controller/replicate/entry/up"
 	zonedown "github.com/mandelsoft/kubedns/internal/controller/replicate/hostedzone/down"
 	zoneup "github.com/mandelsoft/kubedns/internal/controller/replicate/hostedzone/up"
-	"github.com/mandelsoft/kubedns/internal/controller/server/component"
 	srventry "github.com/mandelsoft/kubedns/internal/controller/server/entry"
 	srvzone "github.com/mandelsoft/kubedns/internal/controller/server/hostedzone"
+	"github.com/mandelsoft/kubedns/internal/controller/server/servercomp"
 	"github.com/spf13/pflag"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -79,7 +80,7 @@ func main() {
 			srvzone.Controller(),
 		).
 		AddComponent(
-			component.Server(),
+			component.WithMappings(servercomp.Server()).MapIndex(servercomp.INDEX, "dnsnames"),
 		)
 
 	options := &flagutils.DefaultOptionSet{}
