@@ -62,11 +62,11 @@ func (f *Factory) AddFlags(fs *pflag.FlagSet) {
 
 func (f *Factory) Apply(ctx context.Context, def component.Definition, clusters cluster.Clusters, indices cacheindex.Indices, logger logging.Logger) (component.Component, error) {
 	c := &Component{
-		name:      def.GetName(),
 		cluster:   clusters.Get(replicate.TARGET),
 		index:     indices.Get(INDEX).(cacheindex.TypedIndex[corednsv1alpha1.CoreDNSEntry]),
 		WebServer: NewWebServer(f.port, logger),
 	}
+	c.Base = component.NewBase(def, c)
 	c.model = zonemodel.New(c)
 	c.WebServer.AddEndpoint("/api/v1/zones/", c.handle)
 	return c, nil

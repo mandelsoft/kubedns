@@ -19,7 +19,7 @@ import (
 )
 
 type Component struct {
-	name string
+	*component.Base
 	*WebServer
 
 	index   cacheindex.TypedIndex[corednsv1alpha1.CoreDNSEntry]
@@ -28,11 +28,12 @@ type Component struct {
 }
 
 var _ manager.Runnable = (*Component)(nil)
+var _ component.Component = (*Component)(nil)
 
 var _ zonemodel.Index = (*Component)(nil)
 
-func (c *Component) GetName() string {
-	return c.name
+func (c *Component) GetEffective() component.Component {
+	return c
 }
 
 func (c *Component) GetModel() *zonemodel.Model {
@@ -66,10 +67,14 @@ func (c *Component) handle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	info, err := z.Resolve(c.logger, fields[3])
 	if err != nil {
-		c.SendError(err, w)
+		c.SendError(err, w, http.StatusInternalServerError)
 		return
 	}
 
+	if info == nil {
+		c.SendError(fmt.Errorf("name not in domain"), w, http.StatusBadRequest)
+		return
+	}
 	var answer v1.Answer
 
 	answer.Name = info.EntryName
@@ -77,7 +82,7 @@ func (c *Component) handle(w http.ResponseWriter, r *http.Request) {
 		var zone corednsv1alpha1.HostedZone
 		err := info.Zone.GetSource().(cluster.Cluster).Get(context.Background(), info.Zone.GetKey().NamespacedName, &zone)
 		if err != nil {
-			c.SendError(err, w)
+			c.SendError(err, w, http.StatusInternalServerError)
 			return
 		}
 		answer.Zone.Name = info.ZoneName
@@ -108,7 +113,7 @@ func (c *Component) handle(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (c *Component) SendError(err error, w http.ResponseWriter) {
+func (c *Component) SendError(err error, w http.ResponseWriter, statusCode int) {
 	var e = v1.Error{
 		Error: err.Error(),
 	}
@@ -117,7 +122,7 @@ func (c *Component) SendError(err error, w http.ResponseWriter) {
 	if err != nil {
 		c.logger.Error("%s", err.Error())
 	}
-	w.WriteHeader(http.StatusInternalServerError)
+	w.WriteHeader(statusCode)
 }
 
 func CopyR(list []string, tgt *[]string) {
