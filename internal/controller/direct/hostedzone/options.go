@@ -16,7 +16,7 @@ import (
 
 type Options struct {
 	Runtime          *string
-	Class            string
+	Class            *string
 	DNSClass         string
 	DNSDomain        string
 	DNSNamespace     string
@@ -84,8 +84,12 @@ func (o *Options) Configure(ctx context.Context, cfg *manager.Options, opts flag
 	if o.Runtime != nil && *o.Runtime != "" {
 		cfg.LeaderElectionID = *o.Runtime + "-" + cfg.LeaderElectionID
 	}
-	if o.Class != "" {
-		cfg.LeaderElectionID = o.Class + "-" + cfg.LeaderElectionID
+	if o.Class != nil {
+		if *o.Class != "" {
+			cfg.LeaderElectionID = *o.Class + "-" + cfg.LeaderElectionID
+		} else {
+			cfg.LeaderElectionID = "default-" + cfg.LeaderElectionID
+		}
 	}
 	return nil
 }

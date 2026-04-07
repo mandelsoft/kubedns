@@ -48,7 +48,7 @@ func (r *ReconcileRequest) Reconcile() reconcile.Problem {
 		r.Info("found problem {{error}}", "error", baseerr)
 	}
 	if root != nil {
-		if common.String(root.Spec.Runtime, "") != common.String(r.Reconciler.Options.Runtime, "") || common.String(root.Spec.Class, "") != r.Reconciler.Options.Class {
+		if common.String(root.Spec.Runtime, "") != common.String(r.Reconciler.Options.Runtime, "") || common.String(root.Spec.Class, "") != common.String(r.Reconciler.Options.Class, "") {
 			r.Info("runtime or class mismatch -> ignore", "rumtime", root.Spec.Runtime, "class", root.Spec.Class)
 			return nil
 		}

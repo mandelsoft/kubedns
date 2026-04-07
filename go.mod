@@ -7,8 +7,8 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/kcp-dev/sdk v0.30.0
 	github.com/lestrrat-go/jwx/v2 v2.1.6
-	github.com/mandelsoft/flagutils v0.0.0-20260329130458-d5b113d3e248
-	github.com/mandelsoft/goutils v0.0.0-20260403134733-619dbccc5bdb
+	github.com/mandelsoft/flagutils v0.0.0-20260407154123-526a82628f03
+	github.com/mandelsoft/goutils v0.0.0-20260407151801-9d4576be49b3
 	github.com/mandelsoft/kubecrtutils v0.0.0-20260325101220-db841a30ce37
 	github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4
 	github.com/mandelsoft/spiff v1.3.0-beta-7.0.20251217160149-636218617943

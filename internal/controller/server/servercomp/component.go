@@ -41,6 +41,7 @@ func (c *Component) GetModel() *zonemodel.Model {
 }
 
 func (c *Component) LookupRelativeDomainName(ctx context.Context, zk zonemodel.ZoneKey, rel string) ([]corednsv1alpha1.CoreDNSEntry, error) {
+	c.Info("lookup entries for zone {{key}} rdn {{rdn}}", "key", zk, "rdn", rel)
 	return c.index.GetTyped(ctx, zk.Namespace, IndexKey(zk, rel))
 }
 
@@ -59,6 +60,7 @@ func (c *Component) handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	zk := zonemodel.NewZoneKey(fields[0], fields[1], fields[2])
+	c.Info("request {{fqdn}} for zone {{key}}", "key", zk, "fqdn", fields[3])
 	z := c.model.GetZone(zk)
 	if z == nil {
 		w.WriteHeader(http.StatusNotFound)
@@ -110,19 +112,18 @@ func (c *Component) handle(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		c.logger.Error("%s", err.Error())
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func (c *Component) SendError(err error, w http.ResponseWriter, statusCode int) {
 	var e = v1.Error{
 		Error: err.Error(),
 	}
+	w.WriteHeader(statusCode)
 	d, _ := json.Marshal(&e)
 	_, err = io.Copy(w, bytes.NewReader(d))
 	if err != nil {
 		c.logger.Error("%s", err.Error())
 	}
-	w.WriteHeader(statusCode)
 }
 
 func CopyR(list []string, tgt *[]string) {

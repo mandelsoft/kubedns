@@ -3,6 +3,7 @@ package servercomp
 import (
 	"context"
 
+	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/sliceutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/component"
@@ -20,12 +21,14 @@ import (
 const INDEX = "zonednsnames"
 
 func Server() component.Definition {
-	return component.Define(server.Component, &Factory{}).
+	return component.Define(server.Component, NewFactory()).
 		UseCluster(server.CLUSTER).
 		AddForeignIndex(cacheindex.DefineByFactory[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](INDEX, server.CLUSTER, indexerFactory))
 }
 
 func indexerFactory(ctx context.Context, logger logging.Logger, set types.Clusters) (cacheindex.IndexerFunc[*corednsv1alpha1.CoreDNSEntry], error) {
+	opts := component.DefinitionFromContext(ctx).GetOptions().(*Factory)
+
 	return func(obj *corednsv1alpha1.CoreDNSEntry) []string {
 		if obj.Spec.ZoneRef == "" {
 			logger.Info("omit unassigned entry from index", "entry", client.ObjectKeyFromObject(obj))
@@ -33,13 +36,19 @@ func indexerFactory(ctx context.Context, logger logging.Logger, set types.Cluste
 			return nil
 		}
 		c := meta.FindStatusCondition(obj.Status.Conditions, corednsv1alpha1.ServerConditionType)
-		if c == nil || c.Status == metav1.ConditionFalse {
-			if c == nil {
-				logger.Info("omit unvalidated entry from index", "entry", client.ObjectKeyFromObject(obj))
-			} else {
-				logger.Info("omit invalid entry from index: {{problem}}", "problem", c.Message, "entry", client.ObjectKeyFromObject(obj))
+		if opts.Options.Slave {
+			if c == nil || c.Status == metav1.ConditionFalse {
+				if c == nil {
+					logger.Info("omit unvalidated entry from index", "entry", client.ObjectKeyFromObject(obj))
+				} else {
+					logger.Info("omit invalid entry from index: {{problem}}", "problem", c.Message, "entry", client.ObjectKeyFromObject(obj))
+				}
+				return nil
 			}
-			return nil
+		} else {
+			if obj.Status.State != "Ok" && obj.Status.State != "Ready" {
+				logger.Info("omit invalid entry from index: {{problem}}", "problem", obj.Status.Message, "entry", client.ObjectKeyFromObject(obj))
+			}
 		}
 		key := obj.Namespace + "/" + obj.Spec.ZoneRef
 		names := sliceutils.Transform(obj.Spec.DNSNames, zonemodel.Rdn)
@@ -51,7 +60,12 @@ func indexerFactory(ctx context.Context, logger logging.Logger, set types.Cluste
 }
 
 type Factory struct {
+	flagutils.OptionsRef[*server.Options]
 	port string
+}
+
+func NewFactory() *Factory {
+	return &Factory{OptionsRef: *flagutils.NewOptionsRef[*server.Options](server.NewOptions)}
 }
 
 func (f *Factory) AddFlags(fs *pflag.FlagSet) {

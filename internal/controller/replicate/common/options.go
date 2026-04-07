@@ -14,7 +14,7 @@ import (
 )
 
 type Options struct {
-	Class           string
+	Class           *string
 	Runtime         *string
 	TargetClass     string
 	TargetNamespace string
@@ -37,8 +37,8 @@ func New() *Options {
 }
 
 func (o *Options) ModifyFinalizer(f string) string {
-	if o.Class != "" {
-		f = f + "." + o.Class
+	if o.Class != nil && *o.Class != "" {
+		f = f + "." + *o.Class
 	}
 	if o.Runtime != nil && *o.Runtime != "" {
 		f = f + "." + *o.Runtime

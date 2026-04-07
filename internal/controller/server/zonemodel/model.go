@@ -193,6 +193,8 @@ nextForward:
 		break
 	}
 
+	var list []corednsv1alpha1.CoreDNSEntry
+	var err error
 	curz := cur
 	labels := dns.SplitDomainName(sub)
 	rel := ""
@@ -201,7 +203,7 @@ nextForward:
 		cur = Join(l, cur)
 		rel = Rdn(Join(l, rel))
 		logger.Info("lookup NS record for {{current}}/{{relative}}", "current", cur, "relative", rel)
-		list, err := zone.model.index.LookupRelativeDomainName(nil, zone.key, rel)
+		list, err = zone.model.index.LookupRelativeDomainName(nil, zone.key, rel)
 		if err != nil {
 			return nil, err
 		}
@@ -215,12 +217,7 @@ nextForward:
 		}
 
 	}
-	cur = Join(append(labels, curz)...)
 	var entries []*corednsv1alpha1.CoreDNSEntry
-	list, err := zone.model.index.LookupRelativeDomainName(nil, zone.key, sub)
-	if err != nil {
-		return nil, err
-	}
 	for _, e := range list {
 		logger.Info("found entry {{entry}} for {{current}}[{{zonekey}}]/{{relative}}", "entry", client.ObjectKeyFromObject(&e), "zonekey", zone.key, "current", curz, "relative", sub)
 		entries = append(entries, &e)

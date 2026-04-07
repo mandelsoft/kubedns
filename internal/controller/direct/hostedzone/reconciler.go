@@ -86,7 +86,7 @@ func (r *HostedZoneReconciler) TriggerEntries(ctx context.Context, logger loggin
 }
 
 func (r *HostedZoneReconciler) GetRootInfo(ctx *ReconcileRequest, obj *corednsv1alpha1.HostedZone) (*Responsibility, bool, Problem) {
-	return common.GetRootInfo(ctx, ctx, ctx, obj)
+	return common.GetRootInfo(ctx, ctx, ctx, obj, nil)
 }
 
 func ConditionStatus(b bool) metav1.ConditionStatus {

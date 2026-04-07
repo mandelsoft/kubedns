@@ -39,20 +39,13 @@ func Controller() controller.Definition {
 	return controller.Define[*corednsv1alpha1.HostedZone](common.ControllerHostedzone, "dataplane", &ReconcilerFactory{}).
 		UseCluster("runtime").
 		InGroup("functional").
-		AddIndex(common.IndexKeyZoneParent, parentIndexer).
+		AddIndex(common.IndexKeyZoneParent, common.ParentIndexer).
 		ImportIndex(cacheindex.Ref[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](common.IndexKeyEntryZone, "dataplane")).
 		AddTrigger(
 			controller.OwnerTrigger[*appsv1.Deployment]().OnCluster("runtime"),
 			controller.OwnerTrigger[*corev1.Secret]().OnCluster("runtime"),
 			controller.LocalResourceTriggerByFactory[*corev1.Secret](secretTriggerFactory).OnCluster("runtime"),
 		)
-}
-
-func parentIndexer(o *corednsv1alpha1.HostedZone) []string {
-	if o.Spec.ParentRef == "" {
-		return nil
-	}
-	return []string{o.Spec.ParentRef}
 }
 
 func secretTriggerFactory(ctx context.Context, cntr types.Controller) (handler.TypedMapFuncFactory[*corev1.Secret, sigreconcile.Request], error) {

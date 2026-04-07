@@ -7,7 +7,7 @@ import (
 )
 
 type Options struct {
-	Class   string
+	Class   *string
 	Runtime *string
 }
 
@@ -24,7 +24,7 @@ func NewOptions() *Options {
 }
 
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVarP(&o.Class, "class", "", "", "name of the controller class to handle")
+	pflags.StringRefVarP(fs, &o.Class, "class", "", nil, "name of the controller class to handle")
 	pflags.StringRefVarP(fs, &o.Runtime, "runtime", "", nil, "name of the runtime to handle")
 }
 

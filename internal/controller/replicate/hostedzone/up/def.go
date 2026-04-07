@@ -104,7 +104,7 @@ func (h *Handler) Delete(r *up.ReconcileRequest[*corednsv1alpha1.HostedZone, cor
 }
 
 func (h *Handler) IsResponsible(r *up.ReconcileRequest[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone]) (bool, reconcile.Problem) {
-	info, ok, prob := common.GetRootInfo(r, r, r, r.Object)
+	info, ok, prob := common.GetRootInfo(r, r, r, r.Object, nil)
 
 	if prob != nil {
 		if !ok {

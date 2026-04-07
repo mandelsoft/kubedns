@@ -7,14 +7,18 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
+	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/logging"
 )
 
 const ControllerHostedzone = "hostedzone"
-const IndexKeyZoneParent = "hostedzone.parent"
+const IndexKeyZoneParent = common.IndexKeyZoneParent
 
 const ControllerEntry = "corednsentry"
-const IndexKeyEntryZone = "corednsentry.zone"
+const IndexKeyEntryZone = common.IndexKeyEntryZone
+
+var ParentIndexer = common.ParentIndexer
+var ZoneIndexer = common.ZoneIndexer
 
 type Reconciler struct {
 	logging.Logger

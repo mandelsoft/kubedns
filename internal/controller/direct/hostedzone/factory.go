@@ -38,8 +38,8 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 		r.Options = NewOptions()
 	}
 
-	if r.Options.Class != "" {
-		r.FieldManager += "-" + r.Options.Class
+	if r.Options.Class != nil && *r.Options.Class != "" {
+		r.FieldManager += "-" + *r.Options.Class
 	}
 	if r.Options.Runtime != nil && *r.Options.Runtime != "" {
 		r.FieldManager += "--" + *r.Options.Runtime
