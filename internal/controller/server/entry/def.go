@@ -4,14 +4,14 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/mandelsoft/kubecrtutils/controller/support"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/factories"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/server"
 )
 
 func Controller() controller.Definition {
 	return controller.Define[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](server.ControllerEntry, server.CLUSTER,
-		support.NewByFactory[*server.Options, support.None, *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](&Factory{}),
+		factories.NewByFactory[*server.Options, factories.None, *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](&Factory{}),
 	).
 		InGroup(server.GROUP).
 		UseComponent(server.Component).
@@ -19,16 +19,16 @@ func Controller() controller.Definition {
 }
 
 type Factory struct {
-	support.DefaultFactory[*server.Options, support.None, *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry]
+	factories.DefaultFactory[*server.Options, factories.None, *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry]
 }
 
 func (f *Factory) CreateOptions() *server.Options {
 	return server.NewOptions()
 }
 
-func (f *Factory) CreateRequest(r *reconciler.BaseRequest[*corednsv1alpha1.CoreDNSEntry], r2 *support.Reconciler[*server.Options, support.None, *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry]) reconciler.ReconcileRequest[*corednsv1alpha1.CoreDNSEntry] {
-	if r.Object == nil {
-		return &Request{r, r2.Options, !r2.Options.Slave}
+func (f *Factory) CreateRequest(req *reconciler.BaseRequest[*corednsv1alpha1.CoreDNSEntry], r *factories.Reconciler[*server.Options, factories.None, *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry]) reconciler.ReconcileRequest[*corednsv1alpha1.CoreDNSEntry] {
+	if req.Object == nil {
+		return &Request{req, r.Options, !r.Options.Slave}
 	}
-	return &Request{r, r2.Options, r2.Options.IsMaster(r.Object.Status.Conditions)}
+	return &Request{req, r.Options, r.Options.IsMaster(req.Object.Status.Conditions)}
 }

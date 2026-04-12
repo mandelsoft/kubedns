@@ -7,7 +7,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/mandelsoft/kubecrtutils/controller/support"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/factories"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate/common"
@@ -15,7 +15,7 @@ import (
 
 func Controller[P kubecrtutils.ObjectPointer[T], T any](name, group string, mapprov common.MappingProvider) controller.Definition {
 	return controller.Define[P](name+".down", replicate.TARGET,
-		support.NewByFactory[*common.Options, Settings, P](Factory[P, T]{mapprov: mapprov})).
+		factories.NewByFactory[*common.Options, Settings, P](Factory[P, T]{mapprov: mapprov})).
 		UseCluster(replicate.SOURCE).
 		WithFinalizer(name).
 		InGroup(replicate.GROUP, group).
@@ -27,7 +27,7 @@ type Factory[P kubecrtutils.ObjectPointer[T], T any] struct {
 	common.Factory
 }
 
-var _ support.Factory[*common.Options, Settings, *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry] = Factory[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry]{}
+var _ factories.Factory[*common.Options, Settings, *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry] = Factory[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry]{}
 
 func (f Factory[P, T]) CreateSettings(ctx context.Context, o *common.Options, c controller.TypedController[P, T]) (Settings, error) {
 	src := c.GetClusters().Get(replicate.SOURCE)
@@ -41,9 +41,9 @@ func (f Factory[P, T]) CreateSettings(ctx context.Context, o *common.Options, c 
 	}, nil
 }
 
-func (f Factory[P, T]) CreateRequest(def *reconciler.BaseRequest[P], r *support.Reconciler[*common.Options, Settings, P, T]) reconciler.ReconcileRequest[P] {
+func (f Factory[P, T]) CreateRequest(def *reconciler.BaseRequest[P], r *factories.Reconciler[*common.Options, Settings, P, T]) reconciler.ReconcileRequest[P] {
 	req := &ReconcileRequest[P, T]{
-		DefaultReconcileRequest: reconciler.DefaultReconcileRequest[P, *support.Reconciler[*common.Options, Settings, P, T]]{*def, r},
+		DefaultReconcileRequest: reconciler.DefaultReconcileRequest[P, *factories.Reconciler[*common.Options, Settings, P, T]]{*def, r},
 	}
 	req.MappingContext = req
 	return req

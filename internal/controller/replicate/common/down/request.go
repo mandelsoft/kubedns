@@ -5,7 +5,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/mandelsoft/kubecrtutils/controller/support"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/factories"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate"
@@ -22,7 +22,7 @@ type Settings struct {
 
 type ReconcileRequest[P kubecrtutils.ObjectPointer[T], T any] struct {
 	MappingContext common.Context
-	reconciler.DefaultReconcileRequest[P, *support.Reconciler[*common.Options, Settings, P, T]]
+	reconciler.DefaultReconcileRequest[P, *factories.Reconciler[*common.Options, Settings, P, T]]
 }
 
 func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {

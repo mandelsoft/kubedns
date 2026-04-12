@@ -9,7 +9,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/mandelsoft/kubecrtutils/controller/support"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/factories"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate/common"
@@ -23,10 +23,10 @@ type ResponsibilityHandler[P kubecrtutils.ObjectPointer[T], T any] interface {
 	SetResponsibility(r *ReconcileRequest[P, T], obj P)
 }
 
-func Controller[P kubecrtutils.ObjectPointer[T], T any](name, group string, mp common.MappingProvider, resp ...ResponsibilityFactory[P, T]) controller.TypedDefinition[P, T] {
+func Controller[P kubecrtutils.ObjectPointer[T], T any](name, group string, mp common.MappingProvider, resp ...ResponsibilityFactory[P, T]) controller.CompositionInterface[P, T] {
 	r := general.Optional(resp...)
 	return controller.Define[P, T](name+".up", replicate.SOURCE,
-		support.NewByFactory[*common.Options, Settings[P, T], P, T](&Factory[P, T]{resp: r, mapprov: mp})).
+		factories.NewByFactory[*common.Options, Settings[P, T], P, T](&Factory[P, T]{resp: r, mapprov: mp})).
 		UseCluster(replicate.TARGET).
 		WithFinalizer(name).
 		InGroup(replicate.GROUP, group).
@@ -39,7 +39,7 @@ type Factory[P kubecrtutils.ObjectPointer[T], T any] struct {
 	common.Factory
 }
 
-var _ support.Factory[*common.Options, Settings[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry], *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry] = (*Factory[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry])(nil)
+var _ factories.Factory[*common.Options, Settings[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry], *corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry] = (*Factory[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry])(nil)
 
 func (f *Factory[P, T]) CreateSettings(ctx context.Context, o *common.Options, c controller.TypedController[P, T]) (Settings[P, T], error) {
 	tgt := c.GetClusters().Get(replicate.TARGET).AsCluster()
@@ -63,9 +63,9 @@ func (f *Factory[P, T]) CreateSettings(ctx context.Context, o *common.Options, c
 	}, nil
 }
 
-func (f *Factory[P, T]) CreateRequest(def *reconciler.BaseRequest[P], r *support.Reconciler[*common.Options, Settings[P, T], P, T]) reconciler.ReconcileRequest[P] {
+func (f *Factory[P, T]) CreateRequest(def *reconciler.BaseRequest[P], r *factories.Reconciler[*common.Options, Settings[P, T], P, T]) reconciler.ReconcileRequest[P] {
 	req := &ReconcileRequest[P, T]{
-		DefaultReconcileRequest: reconciler.DefaultReconcileRequest[P, *support.Reconciler[*common.Options, Settings[P, T], P, T]]{*def, r},
+		DefaultReconcileRequest: reconciler.DefaultReconcileRequest[P, *factories.Reconciler[*common.Options, Settings[P, T], P, T]]{*def, r},
 	}
 	req.MappingContext = common.WithCluster(req, r.Settings.Target)
 	return req

@@ -40,7 +40,7 @@ func Controller() controller.Definition {
 		UseCluster("runtime").
 		InGroup("functional").
 		AddIndex(common.IndexKeyZoneParent, common.ParentIndexer).
-		ImportIndex(cacheindex.Ref[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](common.IndexKeyEntryZone, "dataplane")).
+		ImportIndex(cacheindex.Ref[*corednsv1alpha1.CoreDNSEntry](common.IndexKeyEntryZone, "dataplane")).
 		AddTrigger(
 			controller.OwnerTrigger[*appsv1.Deployment]().OnCluster("runtime"),
 			controller.OwnerTrigger[*corev1.Secret]().OnCluster("runtime"),

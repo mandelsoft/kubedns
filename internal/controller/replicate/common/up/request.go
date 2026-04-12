@@ -5,7 +5,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/mandelsoft/kubecrtutils/controller/support"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/factories"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate/common"
@@ -21,7 +21,7 @@ type Settings[P kubecrtutils.ObjectPointer[T], T any] struct {
 }
 
 type ReconcileRequest[P kubecrtutils.ObjectPointer[T], T any] struct {
-	reconciler.DefaultReconcileRequest[P, *support.Reconciler[*common.Options, Settings[P, T], P, T]]
+	reconciler.DefaultReconcileRequest[P, *factories.Reconciler[*common.Options, Settings[P, T], P, T]]
 	MappingContext common.Context
 }
 
@@ -56,11 +56,7 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 	}
 
 	// assure target namespace
-	namespace := objutils.GenerateUniqueName("replica", r.Cluster.GetId(), "", r.Namespace, objutils.MAX_NAMESPACELEN)
-	key := client.ObjectKey{
-		Name:      r.Name,
-		Namespace: namespace,
-	}
+	key := MapKey(r.NamespacedName, r, r.Reconciler.Options.TargetNamespace)
 	prob := s.Mapping.SetOriginal(r.MappingContext, key, r.Request)
 	if prob != nil {
 		return prob
@@ -68,7 +64,8 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 
 	// update replica
 	newp := r.Object.DeepCopyObject().(P)
-	newp.SetNamespace(namespace)
+	newp.SetNamespace(key.Namespace)
+	newp.SetName(key.Name)
 	objutils.CleanupMeta(newp)
 	objutils.SetAnnotation(newp, replicate.ANNOTATION, r.Cluster.GetId())
 	controllerutil.RemoveFinalizer(newp, r.Reconciler.Finalizer)
@@ -115,12 +112,11 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 }
 
 func (r *ReconcileRequest[P, T]) ReconcileDeleting() reconcile.Problem {
-	namespace := objutils.GenerateUniqueName("replica", r.Cluster.GetId(), r.Reconciler.Options.TargetNamespace, r.Namespace, objutils.MAX_NAMESPACELEN)
+	key := MapKey(r.NamespacedName, r, r.Reconciler.Options.TargetNamespace)
 	s := r.Reconciler.Settings
 
 	var tgt T
 	tgtp := P(&tgt)
-	key := client.ObjectKey{Name: r.Name, Namespace: namespace}
 	err := s.Target.Get(r.Context, key, tgtp)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -154,4 +150,20 @@ func (r *ReconcileRequest[P, T]) ReconcileDeleting() reconcile.Problem {
 		return reconcile.TemporaryProblem(s.Target.Delete(r.Context, tgtp))
 	}
 	return nil
+}
+
+func MapKey(key client.ObjectKey, c cluster.Cluster, tgtns string) client.ObjectKey {
+	if tgtns != "" {
+		name := objutils.GenerateUniqueName("replica", c.GetId(), key.Name, key.Namespace, objutils.MAX_NAMELEN)
+		return client.ObjectKey{
+			Name:      name,
+			Namespace: tgtns,
+		}
+	}
+	namespace := objutils.GenerateUniqueName("replica", c.GetId(), "", key.Namespace, objutils.MAX_NAMESPACELEN)
+	return client.ObjectKey{
+		Name:      key.Name,
+		Namespace: namespace,
+	}
+
 }

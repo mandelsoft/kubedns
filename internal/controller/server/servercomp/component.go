@@ -15,11 +15,13 @@ import (
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/server/zonemodel"
 	"github.com/mandelsoft/kubedns/internal/controller/server/zonemodel/api/v1"
+	"github.com/mandelsoft/logging"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 type Component struct {
-	*component.Base
+	logging.Logger
+	comp component.Component
 	*WebServer
 
 	index   cacheindex.TypedIndex[corednsv1alpha1.CoreDNSEntry]
@@ -27,13 +29,14 @@ type Component struct {
 	model   *zonemodel.Model
 }
 
-var _ manager.Runnable = (*Component)(nil)
-var _ component.Component = (*Component)(nil)
+var (
+	_ manager.Runnable                  = (*Component)(nil)
+	_ component.ComponentImplementation = (*Component)(nil)
+	_ zonemodel.Index                   = (*Component)(nil)
+)
 
-var _ zonemodel.Index = (*Component)(nil)
-
-func (c *Component) GetEffective() component.Component {
-	return c
+func (c *Component) GetComponent() component.Component {
+	return c.comp
 }
 
 func (c *Component) GetModel() *zonemodel.Model {
@@ -44,8 +47,6 @@ func (c *Component) LookupRelativeDomainName(ctx context.Context, zk zonemodel.Z
 	c.Info("lookup entries for zone {{key}} rdn {{rdn}}", "key", zk, "rdn", rel)
 	return c.index.GetTyped(ctx, zk.Namespace, IndexKey(zk, rel))
 }
-
-var _ component.Component = (*Component)(nil)
 
 func IndexKey(zk zonemodel.ZoneKey, rdn string) string {
 	return fmt.Sprintf("%s/%s/%s", zk.Namespace, zk.Name, rdn)

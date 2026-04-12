@@ -1,20 +1,20 @@
 module github.com/mandelsoft/kubedns
 
-go 1.25.0
+go 1.25.9
 
 require (
 	github.com/go-test/deep v1.1.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/kcp-dev/sdk v0.30.0
 	github.com/lestrrat-go/jwx/v2 v2.1.6
-	github.com/mandelsoft/flagutils v0.0.0-20260407154123-526a82628f03
+	github.com/mandelsoft/flagutils v0.0.0-20260411162530-8fa8704c866e
 	github.com/mandelsoft/goutils v0.0.0-20260407151801-9d4576be49b3
 	github.com/mandelsoft/kubecrtutils v0.0.0-20260325101220-db841a30ce37
 	github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4
 	github.com/mandelsoft/spiff v1.3.0-beta-7.0.20251217160149-636218617943
 	github.com/miekg/dns v1.1.72
-	github.com/onsi/ginkgo/v2 v2.27.2
-	github.com/onsi/gomega v1.38.2
+	github.com/onsi/ginkgo/v2 v2.28.1
+	github.com/onsi/gomega v1.39.0
 	github.com/spf13/pflag v1.0.10
 	k8s.io/api v0.35.0
 	k8s.io/apimachinery v0.35.0
@@ -51,7 +51,7 @@ require (
 	github.com/google/cel-go v0.26.0 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20251007162407-5df77e3f7d1d // indirect
+	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gowebpki/jcs v1.0.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect

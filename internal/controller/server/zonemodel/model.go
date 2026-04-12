@@ -49,6 +49,11 @@ func (k ZoneKey) String() string {
 	return fmt.Sprint(k.ClusterName, "/", k.Request)
 }
 
+func (k ZoneKey) For(name string) ZoneKey {
+	k.Name = name
+	return k
+}
+
 type Source interface {
 	GetName() string
 }
@@ -89,6 +94,15 @@ func (m *Model) AddZone(s Source, key ZoneKey, zone *corednsv1alpha1.HostedZone)
 	if old == nil {
 		old = NewZone(m, s, key)
 		m.zones[key] = old
+
+		for k, z := range m.zones {
+			if z.parentName != "" {
+				if key == k.For(z.parentName) {
+					z.parent = old
+					old.children[k.Name] = z
+				}
+			}
+		}
 	}
 
 	if old.parent != nil {
