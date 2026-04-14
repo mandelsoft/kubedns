@@ -17,10 +17,8 @@ import (
 	"github.com/mandelsoft/kubecrtutils/setup"
 	"github.com/mandelsoft/kubedns/internal/controller/direct/entry"
 	hostedzone2 "github.com/mandelsoft/kubedns/internal/controller/direct/hostedzone"
-	entrydown "github.com/mandelsoft/kubedns/internal/controller/replicate/entry/down"
-	entryup "github.com/mandelsoft/kubedns/internal/controller/replicate/entry/up"
-	zonedown "github.com/mandelsoft/kubedns/internal/controller/replicate/hostedzone/down"
-	zoneup "github.com/mandelsoft/kubedns/internal/controller/replicate/hostedzone/up"
+	repentry "github.com/mandelsoft/kubedns/internal/controller/replicate/entry"
+	repzone "github.com/mandelsoft/kubedns/internal/controller/replicate/hostedzone"
 	srventry "github.com/mandelsoft/kubedns/internal/controller/server/entry"
 	srvzone "github.com/mandelsoft/kubedns/internal/controller/server/hostedzone"
 	"github.com/mandelsoft/kubedns/internal/controller/server/servercomp"
@@ -70,11 +68,8 @@ func main() {
 			hostedzone2.Controller(),
 			entry.Controller(),
 
-			entryup.Controller(),
-			entrydown.Controller(),
-
-			zoneup.Controller(),
-			zonedown.Controller(),
+			repentry.Controller(),
+			repzone.Controller(),
 
 			srventry.Controller(),
 			srvzone.Controller(),

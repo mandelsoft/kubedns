@@ -1,4 +1,4 @@
-package up
+package hostedzone
 
 import (
 	"context"
@@ -11,39 +11,12 @@ import (
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate"
-	common2 "github.com/mandelsoft/kubedns/internal/controller/replicate/common"
-	"github.com/mandelsoft/kubedns/internal/controller/replicate/common/up"
+	"github.com/mandelsoft/kubedns/internal/controller/replicate/common/generic"
 	"github.com/mandelsoft/logging"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
-
-func Controller() controller.Definition {
-	return up.Controller[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone](
-		replicate.ControllerHostedzone,
-		replicate.HOSTEDZONE_GROUP,
-		common2.ProviderFunc(GetMapping),
-		NewHandler,
-	).
-		AddIndex(replicate.IndexKeyZoneParent, parentIndexer).
-		AddForeignIndex(cacheindex.Define[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](replicate.IndexKeyEntryZone, replicate.SOURCE, zoneIndexer))
-}
-
-func zoneIndexer(res *corednsv1alpha1.CoreDNSEntry) []string {
-	if res.Spec.ZoneRef == "" {
-		return nil
-	}
-	return []string{res.Spec.ZoneRef}
-}
-
-func parentIndexer(o *corednsv1alpha1.HostedZone) []string {
-	if o.Spec.ParentRef == "" {
-		return nil
-	}
-	return []string{o.Spec.ParentRef}
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -57,7 +30,7 @@ type Handler struct {
 	Source cluster.ClusterEquivalent
 }
 
-func NewHandler(c controller.TypedController[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone]) (up.ResponsibilityHandler[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone], error) {
+func Responsibility(c controller.TypedController[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone]) (generic.ResponsibilityHandler[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone], error) {
 	pidx, err := cacheindex.GetIndexFrom[corednsv1alpha1.HostedZone](c, replicate.IndexKeyZoneParent)
 	if err != nil {
 		return nil, err
@@ -75,18 +48,7 @@ func NewHandler(c controller.TypedController[*corednsv1alpha1.HostedZone, coredn
 	}, nil
 }
 
-func GetMapping(o *common2.Options) common2.Mapping {
-	return o.Zones
-}
-
-func (h *Handler) SetStatusCondition(obj *corednsv1alpha1.HostedZone, condition metav1.Condition) bool {
-	if condition.ObservedGeneration == 0 {
-		condition.ObservedGeneration = obj.GetGeneration()
-	}
-	return meta.SetStatusCondition(&obj.Status.Conditions, condition)
-}
-
-func (h *Handler) SetResponsibility(r *up.ReconcileRequest[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone], obj *corednsv1alpha1.HostedZone) {
+func (h *Handler) SetResponsibility(r generic.Request[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone], obj *corednsv1alpha1.HostedZone) {
 	if obj.Spec.ParentRef == "" {
 		if r.Reconciler.Options.TargetClass != "" {
 			obj.Spec.Class = &r.Reconciler.Options.TargetClass
@@ -96,16 +58,15 @@ func (h *Handler) SetResponsibility(r *up.ReconcileRequest[*corednsv1alpha1.Host
 	}
 }
 
-func (h *Handler) Delete(r *up.ReconcileRequest[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone]) {
+func (h *Handler) Delete(r generic.Request[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone]) {
 	delete(h.unresponsible, r.Request)
 	key := r.Request.NamespacedName
 	h.TriggerChildren(r, r, key)
 	h.TriggerEntries(r, r, key)
 }
 
-func (h *Handler) IsResponsible(r *up.ReconcileRequest[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone]) (bool, reconcile.Problem) {
+func (h *Handler) IsResponsible(r generic.Request[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone]) (bool, reconcile.Problem) {
 	info, ok, prob := common.GetRootInfo(r, r, r, r.Object, nil)
-
 	if prob != nil {
 		if !ok {
 			// temporary problem, potentially responsible
@@ -114,7 +75,7 @@ func (h *Handler) IsResponsible(r *up.ReconcileRequest[*corednsv1alpha1.HostedZo
 		}
 		// config problem, cannot determine responsibility
 		r.Info("cannot determine responsibility", "problem", prob)
-		h.SetStatusCondition(r.Object, metav1.Condition{
+		r.SetStatusCondition(r.Object, metav1.Condition{
 			Type:    corednsv1alpha1.ValidationConditionType,
 			Status:  metav1.ConditionFalse, // Use metav1 constant
 			Reason:  corednsv1alpha1.ReasonInvalidParent,
@@ -122,6 +83,7 @@ func (h *Handler) IsResponsible(r *up.ReconcileRequest[*corednsv1alpha1.HostedZo
 		})
 		r.Object.Status.Message = prob.Error().Error()
 		r.Object.Status.State = "Problem"
+
 		// replicate anyway
 		r.Info("replicate for unknown responsibility")
 		h.Handle(r, true)
@@ -137,7 +99,7 @@ func (h *Handler) IsResponsible(r *up.ReconcileRequest[*corednsv1alpha1.HostedZo
 	return false, nil
 }
 
-func (h *Handler) Handle(r *up.ReconcileRequest[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone], resp bool) {
+func (h *Handler) Handle(r generic.Request[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone], resp bool) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 

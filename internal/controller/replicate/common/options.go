@@ -7,7 +7,7 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller"
-	"github.com/mandelsoft/kubecrtutils/owner"
+	"github.com/mandelsoft/kubecrtutils/controller/replication"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate"
 	"github.com/spf13/pflag"
@@ -19,8 +19,7 @@ type Options struct {
 	TargetClass     string
 	TargetNamespace string
 
-	OwnerHandler owner.Handler
-	*ReplicationMapping
+	replication.Mapping
 }
 
 func From(opts flagutils.OptionSetProvider) *Options {
@@ -33,7 +32,12 @@ var (
 )
 
 func New() *Options {
-	return &Options{ReplicationMapping: NewReplicationMapping()}
+	return (&Options{}).New()
+}
+
+func (o *Options) New() *Options {
+	o.Mapping = replication.NewMapping()
+	return o
 }
 
 func (o *Options) ModifyFinalizer(f string) string {
@@ -71,7 +75,6 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 	o.Class = com.Class
 	o.Runtime = com.Runtime
 
-	o.OwnerHandler = owner.NewHandler(clusters.Get(replicate.TARGET))
 	return nil
 }
 

@@ -10,7 +10,7 @@ const HOSTEDZONE_GROUP = "hostedzone-replication"
 const ControllerEntry = "replication.corednsentry"
 const ControllerHostedzone = "replication.hostedzone"
 
-const ANNOTATION = "coredns.mandelsoft.org/replication"
+const REPLICATED_ANNOTATION = "coredns.mandelsoft.org/replication"
 
 const IndexKeyZoneParent = "replication.corednsentry.zone"
 const IndexKeyEntryZone = "replication.corednsentry.entries"

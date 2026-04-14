@@ -8,7 +8,7 @@ require (
 	github.com/kcp-dev/sdk v0.30.0
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/mandelsoft/flagutils v0.0.0-20260411162530-8fa8704c866e
-	github.com/mandelsoft/goutils v0.0.0-20260407151801-9d4576be49b3
+	github.com/mandelsoft/goutils v0.0.0-20260414123113-d90bf06bf110
 	github.com/mandelsoft/kubecrtutils v0.0.0-20260325101220-db841a30ce37
 	github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4
 	github.com/mandelsoft/spiff v1.3.0-beta-7.0.20251217160149-636218617943

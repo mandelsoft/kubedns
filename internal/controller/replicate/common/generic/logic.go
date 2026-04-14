@@ -1,11 +1,11 @@
-package up
+package generic
 
 import (
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
-	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/factories"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/logic"
+	"github.com/mandelsoft/kubecrtutils/controller/replication"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate"
 	"github.com/mandelsoft/kubedns/internal/controller/replicate/common"
@@ -14,19 +14,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+type Request[P kubecrtutils.ObjectPointer[T], T any] = *logic.Request[*common.Options, Settings[P, T], P, T]
+
 type Settings[P kubecrtutils.ObjectPointer[T], T any] struct {
 	Target  cluster.Cluster
-	Mapping common.Mapping
 	Resp    ResponsibilityHandler[P, T]
+	Mapping replication.ResourceMapping
+	*common.Options
 }
 
-type ReconcileRequest[P kubecrtutils.ObjectPointer[T], T any] struct {
-	reconciler.DefaultReconcileRequest[P, *factories.Reconciler[*common.Options, Settings[P, T], P, T]]
-	MappingContext common.Context
-}
+func (f *ReconcilationLogic[P, T]) Reconcile(r Request[P, T]) reconcile.Problem {
+	obj := r.GetObject()
 
-func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
-	if objutils.GetAnnotation(r.Object, replicate.ANNOTATION) != "" {
+	if objutils.GetAnnotation(obj, replicate.REPLICATED_ANNOTATION) != "" {
 		r.Info("skip replicated object")
 		return nil
 	}
@@ -47,6 +47,8 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 			return prob
 		}
 	}
+
+	// taking responsibility
 	patch := client.MergeFrom(r.GetOrig())
 	if controllerutil.AddFinalizer(r.Object, r.Reconciler.Finalizer) {
 		if err := r.Patch(r, r.Object, patch); err != nil {
@@ -56,8 +58,8 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 	}
 
 	// assure target namespace
-	key := MapKey(r.NamespacedName, r, r.Reconciler.Options.TargetNamespace)
-	prob := s.Mapping.SetOriginal(r.MappingContext, key, r.Request)
+	key := MapKey(r.NamespacedName, r, s.TargetNamespace)
+	prob := s.Mapping.SetOriginal(replication.WithCluster(r, s.Target), key, r.Request)
 	if prob != nil {
 		return prob
 	}
@@ -67,24 +69,26 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 	newp.SetNamespace(key.Namespace)
 	newp.SetName(key.Name)
 	objutils.CleanupMeta(newp)
-	objutils.SetAnnotation(newp, replicate.ANNOTATION, r.Cluster.GetId())
+	objutils.SetAnnotation(newp, replicate.REPLICATED_ANNOTATION, r.Cluster.GetId())
 	controllerutil.RemoveFinalizer(newp, r.Reconciler.Finalizer)
 	if s.Resp != nil {
 		s.Resp.SetResponsibility(r, newp)
 	}
-	err := r.Reconciler.Options.OwnerHandler.SetOwner(r.Cluster, r.Object, s.Target, newp)
+	err := r.SetOwner(r.Cluster, r.Object, s.Target, newp)
 	if err != nil {
 		return reconcile.TemporaryProblem(err)
 	}
+
+	// update/create replica
 	var tgt T
 	tgtp := P(&tgt)
-	err = s.Target.Get(r.Context, key, tgtp)
+	err = s.Target.Get(r, key, tgtp)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return reconcile.TemporaryProblem(err)
 		}
 		r.Info("create in target")
-		err = s.Target.Create(r.Context, newp, &client.CreateOptions{
+		err = s.Target.Create(r, newp, &client.CreateOptions{
 			FieldManager: r.Reconciler.FieldManager,
 		})
 	} else {
@@ -94,6 +98,8 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 			return nil
 		}
 		newp.SetFinalizers(tgtp.GetFinalizers())
+
+		// update status
 		status, err := objutils.GetStatusField(tgtp)
 		if err != nil {
 			r.Info("cannot determine status field")
@@ -111,13 +117,13 @@ func (r *ReconcileRequest[P, T]) Reconcile() reconcile.Problem {
 	return reconcile.TemporaryProblem(client.IgnoreNotFound(err))
 }
 
-func (r *ReconcileRequest[P, T]) ReconcileDeleting() reconcile.Problem {
+func (f *ReconcilationLogic[P, T]) ReconcileDeleting(r Request[P, T]) reconcile.Problem {
 	key := MapKey(r.NamespacedName, r, r.Reconciler.Options.TargetNamespace)
 	s := r.Reconciler.Settings
 
 	var tgt T
 	tgtp := P(&tgt)
-	err := s.Target.Get(r.Context, key, tgtp)
+	err := s.Target.Get(r, key, tgtp)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return reconcile.TemporaryProblem(err)
@@ -130,7 +136,7 @@ func (r *ReconcileRequest[P, T]) ReconcileDeleting() reconcile.Problem {
 				return reconcile.TemporaryProblem(client.IgnoreNotFound(err))
 			}
 		}
-		return s.Mapping.RemoveOriginal(r.MappingContext, key)
+		return s.Mapping.RemoveOriginal(replication.WithCluster(r, s.Target), key)
 	}
 	patch := client.MergeFrom(tgtp.DeepCopyObject().(client.Object))
 	if controllerutil.RemoveFinalizer(tgtp, r.Reconciler.Finalizer) {
@@ -149,7 +155,11 @@ func (r *ReconcileRequest[P, T]) ReconcileDeleting() reconcile.Problem {
 		r.Info("request replica deletion")
 		return reconcile.TemporaryProblem(s.Target.Delete(r.Context, tgtp))
 	}
-	return nil
+	return reconcile.Succeeded()
+}
+
+func (f *ReconcilationLogic[P, T]) ReconcileDeleted(r Request[P, T]) reconcile.Problem {
+	return reconcile.Succeeded()
 }
 
 func MapKey(key client.ObjectKey, c cluster.Cluster, tgtns string) client.ObjectKey {

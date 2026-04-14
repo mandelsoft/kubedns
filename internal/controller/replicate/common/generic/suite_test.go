@@ -1,4 +1,4 @@
-package up_test
+package generic_test
 
 import (
 	"testing"
