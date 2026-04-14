@@ -26,7 +26,7 @@ func Server() component.Definition {
 		AddForeignIndex(cacheindex.DefineByFactory[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](INDEX, server.CLUSTER, indexerFactory))
 }
 
-func indexerFactory(ctx context.Context, logger logging.Logger, set types.Clusters) (cacheindex.IndexerFunc[*corednsv1alpha1.CoreDNSEntry], error) {
+func indexerFactory(ctx context.Context, logger logging.Logger, set types.Clusters) (cacheindex.TypedIndexerFunc[*corednsv1alpha1.CoreDNSEntry], error) {
 	opts := component.DefinitionFromContext(ctx).GetOptions().(*Factory)
 
 	return func(obj *corednsv1alpha1.CoreDNSEntry) []string {
