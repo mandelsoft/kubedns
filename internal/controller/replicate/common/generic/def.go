@@ -2,6 +2,7 @@ package generic
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/kubecrtutils"
@@ -40,6 +41,12 @@ type ReconcilationLogic[P kubecrtutils.ObjectPointer[T], T any] struct {
 func (f *ReconcilationLogic[P, T]) CreateSettings(ctx context.Context, o *common.Options, c controller.TypedController[P, T]) (Settings[P, T], error) {
 	tgt := c.GetClusters().Get(replicate.TARGET).AsCluster()
 	l := c.GetLogger()
+	if c.GetLogicalCluster(replicate.SOURCE) == nil {
+		return Settings[P, T]{}, fmt.Errorf("%s cluster is required", replicate.SOURCE)
+	}
+	if c.GetLogicalCluster(replicate.TARGET) == nil {
+		return Settings[P, T]{}, fmt.Errorf("%s cluster is required", replicate.TARGET)
+	}
 	l.Info("creating entry down replicator...")
 	l.Info("using source {{ctype}} {{cluster}}[{{info}}]", "ctype", c.GetCluster().GetTypeInfo(), "cluster", c.GetCluster().GetName(), "info", c.GetCluster().GetInfo())
 	l.Info("using target {{ctype}} {{cluster}}[{{info}}]", "ctype", tgt.GetTypeInfo(), "cluster", tgt.GetName(), "info", tgt.GetInfo())

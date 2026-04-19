@@ -10,7 +10,7 @@ import (
 func Controller() controller.Definition {
 	return controller.DefineByFunc[*corednsv1alpha1.CoreDNSEntry](common.ControllerEntry, "dataplane", CreateReconciler).
 		UseCluster("runtime").
-		InGroup("functional").
+		InGroup("operator").
 		AddIndex(common.IndexKeyEntryZone, common.ZoneIndexer).
 		ImportIndex(cacheindex.Ref[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone](common.IndexKeyZoneParent, "dataplane"))
 }

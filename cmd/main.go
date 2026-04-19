@@ -56,7 +56,7 @@ func main() {
 	setup.ExitIfErr(hostedzone2.TestRenderManifests(setup.Log), "problems with included manifests")
 	setup.ExitIfErr(hostedzone2.TestRenderKubeDNSManifests(setup.Log), "problems with included dns manifests")
 
-	def := ctrlmgmt.Define(corednsv1alpha1.GroupVersion.Group, "source").
+	def := ctrlmgmt.Define(corednsv1alpha1.GroupVersion.Group, "runtime").
 		WithScheme(scheme).
 		AddCluster(
 			cluster.Define("runtime", "runtime cluster").WithFallback("dataplane"),

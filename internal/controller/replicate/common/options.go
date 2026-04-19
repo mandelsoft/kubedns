@@ -2,14 +2,11 @@ package common
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller"
 	"github.com/mandelsoft/kubecrtutils/controller/replication"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
-	"github.com/mandelsoft/kubedns/internal/controller/replicate"
 	"github.com/spf13/pflag"
 )
 
@@ -56,17 +53,6 @@ func (o *Options) Prepare(ctx context.Context, opts flagutils.OptionSet, v flagu
 
 func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	var err error
-
-	clusters, err := cluster.ValidatedClusters(ctx, opts, v)
-	if err != nil {
-		return err
-	}
-	if clusters.Get(replicate.SOURCE) == nil {
-		return fmt.Errorf("%s cluster is required", replicate.SOURCE)
-	}
-	if clusters.Get(replicate.TARGET) == nil {
-		return fmt.Errorf("% cluster is required", replicate.TARGET)
-	}
 
 	com, err := flagutils.ValidatedOptions[*common.Options](ctx, opts, v)
 	if err != nil {
