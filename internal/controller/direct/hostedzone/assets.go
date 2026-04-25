@@ -3,6 +3,7 @@ package hostedzone
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"strings"
@@ -65,17 +66,32 @@ func TestRenderManifests(logger logging.Logger) error {
 	if err != nil {
 		return fmt.Errorf("get local mode values: %w", err)
 	}
-	_, _, err = render.Render(manifests, values)
+	dataplane, runtime, err := render.Render(manifests, values)
 	if err != nil {
 		return fmt.Errorf("local mode rendering: %w", err)
 	}
 
+	fmt.Printf("*** local mode:\n")
+	vd, _ := json.Marshal(values)
+	fmt.Printf("values: %s\n", string(vd))
+	fmt.Printf("dataplane manifests:\n")
+	for k, v := range dataplane {
+		fmt.Printf("- %s:\n", k)
+		fmt.Printf("    %s\n", strings.Replace(string(v), "\n", "\n    ", -1))
+	}
+	fmt.Printf("runtime manifests:\n")
+	for k, v := range runtime {
+		fmt.Printf("- %s:\n", k)
+		fmt.Printf("    %s\n", strings.Replace(string(v), "\n", "\n    ", -1))
+	}
+
+	//////////////
 	r.Options.RuntimeNamespace = ""
 	values, err = ctx.Values(NewRuntimeMode(r), false)
 	if err != nil {
 		return fmt.Errorf("get runtime mode values: %w", err)
 	}
-	dataplane, runtime, err := render.Render(manifests, values)
+	dataplane, runtime, err = render.Render(manifests, values)
 	if err != nil {
 		return fmt.Errorf("runtime mode rendering: %w", err)
 	}
@@ -90,6 +106,7 @@ func TestRenderManifests(logger logging.Logger) error {
 		return fmt.Errorf("cenbtral runtime mode rendering: %w", err)
 	}
 
+	fmt.Printf("*** remote mode:\n")
 	fmt.Printf("dataplane manifests:\n")
 	for k, v := range dataplane {
 		fmt.Printf("- %s:\n", k)

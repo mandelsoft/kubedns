@@ -105,7 +105,7 @@ func (f *ReconcilationLogic[P, T]) Reconcile(r Request[P, T]) reconcile.Problem 
 			r.Info("cannot determine status field")
 			return nil
 		}
-		err = objutils.SetStatusField(newp, status)
+		err = objutils.SetStatusField(r.Object, status)
 		if err != nil {
 			r.Info("cannot set status field")
 			return nil

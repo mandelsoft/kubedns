@@ -1,9 +1,14 @@
 package render
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strconv"
+	"strings"
 
+	yaml2 "github.com/goccy/go-yaml"
+	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/spiff/spiffing"
 	"github.com/mandelsoft/spiff/yaml"
 )
@@ -69,7 +74,55 @@ func Render(manifests map[string][]byte, values map[string]interface{}) (datapla
 			}
 		}
 	}
+	apply_hashes(runtime)
 	return dataplane, runtime, nil
+}
+
+func apply_hashes(manifests map[string][]byte) error {
+	mod := true
+
+	for mod {
+		mod = false
+		for n, v := range manifests {
+			var m map[string]interface{}
+
+			err := yaml2.Unmarshal(v, &m)
+			if err != nil {
+				return err
+			}
+
+			meta := generics.Cast[map[string]interface{}](m["metadata"])
+			if meta != nil {
+				annos := generics.Cast[map[string]interface{}](meta["annotations"])
+				changed := false
+				for k, cur := range annos {
+					if strings.HasPrefix(k, "hashes.") {
+						data := manifests[k[len("hashes."):]]
+						if len(data) > 0 {
+							h := sha256.Sum256(data)
+							n := hex.EncodeToString(h[:])
+							if n != cur {
+								changed = true
+								annos[k] = n
+							}
+						} else {
+							changed = true
+							delete(annos, k)
+						}
+					}
+				}
+				if changed {
+					mod = true
+					v, err := yaml2.Marshal(m)
+					if err != nil {
+						return err
+					}
+					manifests[n] = v
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func retrieve(ctx spiffing.Spiff, name string, result yaml.Node, dataplane *map[string][]byte, runtime *map[string][]byte) error {

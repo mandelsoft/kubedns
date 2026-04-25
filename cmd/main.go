@@ -10,13 +10,18 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet/kcp"
 	"github.com/mandelsoft/kubecrtutils/component"
+	"github.com/mandelsoft/kubecrtutils/controller"
 	"github.com/mandelsoft/kubecrtutils/ctrlmgmt"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/options/activationopts"
 	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
 	"github.com/mandelsoft/kubecrtutils/options/mlogopts"
+	"github.com/mandelsoft/kubecrtutils/options/workeropts"
 	"github.com/mandelsoft/kubecrtutils/setup"
+	"github.com/mandelsoft/kubedns/internal/controller/direct"
 	"github.com/mandelsoft/kubedns/internal/controller/direct/entry"
-	hostedzone2 "github.com/mandelsoft/kubedns/internal/controller/direct/hostedzone"
+	"github.com/mandelsoft/kubedns/internal/controller/direct/hostedzone"
+	"github.com/mandelsoft/kubedns/internal/controller/replicate"
 	repentry "github.com/mandelsoft/kubedns/internal/controller/replicate/entry"
 	repzone "github.com/mandelsoft/kubedns/internal/controller/replicate/hostedzone"
 	srventry "github.com/mandelsoft/kubedns/internal/controller/server/entry"
@@ -50,11 +55,19 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+const IndexKeyEntryZone = "entry2zone"
+const IndexKeyZoneParent = "zone2parent"
+
 // nolint:gocyclo
 func main() {
 
-	setup.ExitIfErr(hostedzone2.TestRenderManifests(setup.Log), "problems with included manifests")
-	setup.ExitIfErr(hostedzone2.TestRenderKubeDNSManifests(setup.Log), "problems with included dns manifests")
+	setup.ExitIfErr(hostedzone.TestRenderManifests(setup.Log), "problems with included manifests")
+	setup.ExitIfErr(hostedzone.TestRenderKubeDNSManifests(setup.Log), "problems with included dns manifests")
+
+	// index mappings for direct controllers
+	dmap := mapping.NewConfigurableControllerMappings().
+		MapIndex(direct.IndexKeyEntryZone, IndexKeyEntryZone).
+		MapIndex(direct.IndexKeyZoneParent, IndexKeyZoneParent)
 
 	def := ctrlmgmt.Define(corednsv1alpha1.GroupVersion.Group, "runtime").
 		WithScheme(scheme).
@@ -65,11 +78,15 @@ func main() {
 			cluster.Define("target", "replication target").WithFallback(cluster.DEFAULT),
 		).
 		AddController(
-			hostedzone2.Controller(),
-			entry.Controller(),
+			controller.WithMappings(hostedzone.Controller()).
+				UseMappings(dmap),
+			controller.WithMappings(entry.Controller()).
+				UseMappings(dmap),
 
 			repentry.Controller(),
-			repzone.Controller(),
+			controller.WithMappings(repzone.Controller()).
+				MapIndex(replicate.IndexKeyEntryZone, IndexKeyEntryZone).
+				MapIndex(replicate.IndexKeyZoneParent, IndexKeyZoneParent),
 
 			srventry.Controller(),
 			srvzone.Controller(),
@@ -84,6 +101,7 @@ func main() {
 		metricsopts.New(),    // options to control the manager metrics service
 		mlogopts.New(true),   // options to control mandelsoft/logging
 		activationopts.New(), // enable controller selection
+		workeropts.New(),     // enable work queue configuration
 		// other options
 	)
 

@@ -7,18 +7,9 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/internal/controller/common"
+	"github.com/mandelsoft/kubedns/internal/controller/direct"
 	"github.com/mandelsoft/logging"
 )
-
-const ControllerHostedzone = "hostedzone"
-const IndexKeyZoneParent = common.IndexKeyZoneParent
-
-const ControllerEntry = "corednsentry"
-const IndexKeyEntryZone = common.IndexKeyEntryZone
-
-var ParentIndexer = common.ParentIndexer
-var ZoneIndexer = common.ZoneIndexer
 
 type Reconciler struct {
 	logging.Logger
@@ -30,11 +21,11 @@ type Reconciler struct {
 }
 
 func NewReconciler(c controller.Controller) (*Reconciler, error) {
-	pidx, err := cacheindex.GetIndexFrom[corednsv1alpha1.HostedZone](c, IndexKeyZoneParent)
+	pidx, err := cacheindex.GetIndexFrom[corednsv1alpha1.HostedZone](c, direct.IndexKeyZoneParent)
 	if err != nil {
 		return nil, err
 	}
-	eidx, err := cacheindex.GetIndexFrom[corednsv1alpha1.CoreDNSEntry](c, IndexKeyEntryZone)
+	eidx, err := cacheindex.GetIndexFrom[corednsv1alpha1.CoreDNSEntry](c, direct.IndexKeyEntryZone)
 	if err != nil {
 		return nil, err
 	}

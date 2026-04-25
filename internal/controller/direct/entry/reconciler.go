@@ -23,6 +23,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
+	"github.com/mandelsoft/kubedns/internal/controller/direct"
 	"github.com/mandelsoft/kubedns/internal/controller/direct/common"
 	hostedzone2 "github.com/mandelsoft/kubedns/internal/controller/direct/hostedzone"
 	crtreconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -53,7 +54,7 @@ func CreateReconciler(ctx context.Context, controller controller.TypedController
 	}
 	base.Info("creating entry reconciler...")
 
-	d := controller.GetControllerManager().GetControllerDefinition(common.ControllerHostedzone)
+	d := controller.GetControllerManager().GetControllerDefinition(direct.ControllerHostedzone)
 
 	r := &CoreDNSEntryReconciler{
 		Reconciler: base,

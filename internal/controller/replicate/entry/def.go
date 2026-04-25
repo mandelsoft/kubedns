@@ -13,7 +13,7 @@ import (
 func Controller() controller.Definition {
 	return generic.Controller[*corednsv1alpha1.CoreDNSEntry, corednsv1alpha1.CoreDNSEntry](
 		replicate.ControllerEntry,
-		replicate.ENTRY_GROUP,
+		replicate.GROUP,
 		Responsibility,
 	)
 }

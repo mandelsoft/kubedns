@@ -29,7 +29,7 @@ func Controller[P kubecrtutils.ObjectPointer[T], T any](name, group string, resp
 		logic.New[*common.Options, Settings[P, T], P, T](&ReconcilationLogic[P, T]{resp: r})).
 		UseCluster(replicate.TARGET).
 		WithFinalizer(name).
-		InGroup(replicate.GROUP, group).
+		InGroup(group).
 		AddTrigger(controller.OwnerTrigger[P]().OnCluster(controllers.TARGET)).
 		WithActivationConstraint(constraints.Complete(group))
 }

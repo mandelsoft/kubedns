@@ -25,6 +25,10 @@ metadata:
   labels:
     target: runtime
     app: (( values.runtime.label ))
+  annotations:
+    hashes.secret.yaml: (( optional( values.runtime.secret.name == "", "use") ))
+    hashes.config.yaml: use
+
 spec:
   replicas: (( values.runtime.replicas ))
   selector:
@@ -36,7 +40,7 @@ spec:
         app: (( values.runtime.label ))
     spec:
       automountServiceAccountToken: (( values.runtime.secret.name == "" ))
-      serviceAccountName: (( optional( values.runtime.secret.name == "", values.runtime.name) ))
+      serviceAccountName: (( optional( values.runtime.secret.name == "", values.dataplane.access.serviceaccount) ))
       containers:
         - name: dns-container
           # Use your actual image here. Using coredns/coredns as an example.

@@ -11,6 +11,8 @@ For every root zone such a dns server is deployed acting as *Authoritative Name 
 
 ## Basic Architecture
 
+The controllers are implementated with the [kubecrtutils](https://github.com/mandelsoft/kubecrtutils) library, which is a wrapper arround the multi-cluster runtime library supporting logigal clusters and fleets.
+
 ### User-facing API
 
 This system uses two custom resources `HostedZone`and `CoreDNSEntry` to configure authoritative name servers.
@@ -39,9 +41,43 @@ If a separate runtime cluster is used additionally a service account `Secret` is
 
 ## Operational modes
 
+The controller manager provides three pairs of controllers used to implement
+different scenarios:
+- *direct scenario*
+  The controller group `operator` provides controllers directly implementing the
+  DNS provider scenario.
+
+  They act on two logical clusters:
+  - `dataplane`: the objectspace holding the user facing resources. It might be backed by a regular Kubernetes cluster or a fleet (like a KCP fleet).
+  - `runtime`: the Kubernetes cluster used to deploy the DNS servers. This must be backed by a Kubernetes cluster.
+  
+- *replication scenario*
+  The controller group `replication` provides controllers usable to replicate user facing resources into another dataplane. 
+  
+  They act on two logical clusters:
+  - `source`: the objectspace holding the user facing resources. It might be backed by a regular Kubernetes cluster or a fleet (like a KCP fleet).
+  - `target`: The target Kubernetes cluster to replicate to. This must be backed by a Kubernetes cluster.
+
+  This groupo map be combined with group `operator`, to work locally on the target cluster, or with the group `server`.
+
+- *REST server scenario*
+  The controller group `server` provides controllers used to feed a REST server to offer query operations for FQDNs in the context of a hosted zone defined
+  by a cluster identity, namespace and object name of the hostedzone object.
+
+  They act on one logical cluster:
+  - `source`: the objectspace holding the user facing resources. It might be backed by a regular Kubernetes cluster or a fleet (like a KCP fleet).
+
+The controller manager offers the following logical clusters:
+- `source`: cluster for the user facing API. It falls back to cluster `target`. It might be backed by a fleet.
+- `target`: a replication target. It uses the default cluster as fallback.
+- `runtime`: the runtime cluster used to deploy DNS servers. It falls back to `dataplane`.
+- `dataplane`: the API cluster used to control the DNS server deployment. It falls back to cluster `target`.
+
+Those clusters are directly mapped to the controller clusters.
+
 ### API/Runtime Organization
 
-The controller is able to work with different operational modes
+The operator is able to work with different operational modes
 requiring one or two Kubernetes dataplanes.
 - *Vanilla Mode*: A single cluster is used for the end-user (this is the API) to configure zones and records and to deploy the runtime for the dns servers. The dns servers and required additional resources are deployed into the user namespace. API users should only have permissions for the dns resources.
 
@@ -87,36 +123,51 @@ there is an interface to plug-in such support, but it is not available as part o
 ## Options
 
 ```
-Usage of kubedns:
---class string                           name of the controller class to handle
---dataplane-kubeconfig string            user api cluster
---dataplane-kubeconfig-context string    context used together with dataplane-kubeconfig
---dataplane-kubeconfig-identity string   context used together with dataplane-kubeconfig
---dns-class string                       DNS class for managed nameserver DNS names (default "dns-system")
---dns-domain string                      DNS domain for managed nameserver DNS names
---dns-mode string                        DNS mode for providing nameserver cnames [gardener,kubedns,loadbalancer] (default "loadbalancer")
---enable-http2                           If set, HTTP/2 will be enabled for the metrics and webhook servers
---health-probe-bind-address string       The address the probe endpoint binds to. (default ":8081")
---iaas string                            IaaS layer to use (special support so far for "aws" (default "default")
---kubeconfig string                      path to standard kubeconfig
---kubeconfig-context string              context used together with kubeconfig
---kubeconfig-identity string             context used together with kubeconfig
---leader-elect                           Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.
---leader-elect-namespace string          leader election namespace
---leader-election-id string              Id for leader election
---log-level string                       logging level (default "info")
---log-rule stringToString                logging rules (default [])
---metrics-bind-address string            The address the metrics endpoint binds to. Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service. (default "0")
---metrics-cert-key string                The name of the metrics server key file. (default "tls.key")
---metrics-cert-name string               The name of the metrics server certificate file. (default "tls.crt")
---metrics-cert-path string               The directory that contains the metrics server certificate.
---metrics-secure                         If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead. (default true)
---ns-namespace string                    namespace used to request nameserver DNS names (default "dns-system")
---runtime string                         name of the runtime class to handle
---runtime-kubeconfig string              runtime cluster
---runtime-kubeconfig-context string      context used together with runtime-kubeconfig
---runtime-kubeconfig-identity string     context used together with runtime-kubeconfig
---runtime-namespace string               use single runtime namespace for deployments## Getting Started
+Usage of dnsmanager:
+      --class *string                               name of the controller class to handle (default <none>)
+      --controllers strings                         activated controllers (corednsentry, hostedzone, replication.corednsentry, replication.hostedzone, server.corednsentry, server.hostedzone, all, operator, replication, server). (default [all])
+      --dataplane-kubeconfig string                 api cluster for functional controllers
+      --dataplane-kubeconfig-context string         context used together with dataplane-kubeconfig
+      --dataplane-kubeconfig-endpointslice string   endpointslice used together with dataplane-kubeconfigfor APIExport
+      --dataplane-kubeconfig-identity string        identity used together with dataplane-kubeconfig
+      --dns-class string                            DNS class for managed nameserver DNS names (default "dns-system")
+      --dns-domain string                           DNS domain for managed nameserver DNS names
+      --dns-mode string                             DNS mode for providing nameserver cnames [gardener,kubedns,loadbalancer] (default "loadbalancer")
+      --dnsapi string                               The port on which to run the DNS API server. (default ":8085")
+      --enable-http2                                If set, HTTP/2 will be enabled for the metrics and webhook servers
+      --health-probe-bind-address string            The address the probe endpoint binds to. (default ":8081")
+      --iaas string                                 IaaS layer to use (special support so far for "aws" (default "default")
+      --kubeconfig string                           path to standard kubeconfig
+      --kubeconfig-context string                   context used together with kubeconfig
+      --kubeconfig-identity string                  identity used together with kubeconfig
+      --leader-elect                                Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.
+      --leader-elect-namespace string               leader election namespace
+      --leader-election-id string                   Id for leader election
+      --log-level string                            logging level (default "info")
+      --log-rule stringToString                     logging rules (default [])
+      --metrics-bind-address string                 The address the metrics endpoint binds to. Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service. (default "0")
+      --metrics-cert-key string                     The name of the metrics server key file. (default "tls.key")
+      --metrics-cert-name string                    The name of the metrics server certificate file. (default "tls.crt")
+      --metrics-cert-path string                    The directory that contains the metrics server certificate.
+      --metrics-secure                              If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead. (default true)
+      --ns-namespace string                         namespace used to request nameserver DNS names (default "dns-system")
+      --runtime *string                             name of the runtime to handle (default <none>)
+      --runtime-kubeconfig string                   runtime cluster
+      --runtime-kubeconfig-context string           context used together with runtime-kubeconfig
+      --runtime-kubeconfig-identity string          identity used together with runtime-kubeconfig
+      --runtime-namespace string                    use single runtime namespace for deployments
+      --server-class *string                        class name to be served by REST server (default <none>)
+      --slave-mode                                  run server in slave mode
+      --source-kubeconfig string                    user api cluster
+      --source-kubeconfig-context string            context used together with source-kubeconfig
+      --source-kubeconfig-endpointslice string      endpointslice used together with source-kubeconfigfor APIExport
+      --source-kubeconfig-identity string           identity used together with source-kubeconfig
+      --target-class string                         target class for replication
+      --target-kubeconfig string                    replication target
+      --target-kubeconfig-context string            context used together with target-kubeconfig
+      --target-kubeconfig-identity string           identity used together with target-kubeconfig
+      --target-namespace string                     namespace used to request nameserver DNS names
+      --workers stringToInt                         workers for controller (default [])
 ```
 
 ## System Setup

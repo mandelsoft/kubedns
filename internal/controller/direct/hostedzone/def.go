@@ -25,7 +25,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/handler"
 	"github.com/mandelsoft/kubecrtutils/types"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
-	"github.com/mandelsoft/kubedns/internal/controller/direct/common"
+	"github.com/mandelsoft/kubedns/internal/controller/direct"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -36,11 +36,11 @@ import (
 const INDEX_SASECFRET = "serviceaccount-secret"
 
 func Controller() controller.Definition {
-	return controller.Define[*corednsv1alpha1.HostedZone](common.ControllerHostedzone, "dataplane", &ReconcilerFactory{}).
+	return controller.Define[*corednsv1alpha1.HostedZone](direct.ControllerHostedzone, "dataplane", &ReconcilerFactory{}).
 		UseCluster("runtime").
-		InGroup("operator").
-		AddIndex(common.IndexKeyZoneParent, common.ParentIndexer).
-		ImportIndex(cacheindex.Ref[*corednsv1alpha1.CoreDNSEntry](common.IndexKeyEntryZone, "dataplane")).
+		InGroup(direct.GROUP).
+		AddIndex(direct.IndexKeyZoneParent, direct.ParentIndexer).
+		ImportIndex(cacheindex.Ref[*corednsv1alpha1.CoreDNSEntry](direct.IndexKeyEntryZone, "dataplane")).
 		AddTrigger(
 			controller.OwnerTrigger[*appsv1.Deployment]().OnCluster("runtime"),
 			controller.OwnerTrigger[*corev1.Secret]().OnCluster("runtime"),

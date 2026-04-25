@@ -2,6 +2,7 @@ package hostedzone
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 
@@ -107,6 +108,8 @@ func Values(c ReconcileContext, m Mode, deleting bool) (map[string]interface{}, 
 	}
 	tmp, repeat := m.AccessValues(c, accname, deleting)
 	mergeValues(access, tmp)
+	data, _ := json.Marshal(values)
+	c.Info("values {{values}}", "values", string(data))
 	return values, repeat
 }
 

@@ -18,6 +18,13 @@ func NewLocalMode(r *HostedZoneReconciler) Mode {
 	return &LocalMode{ModeImpl{r}}
 }
 
+func (m *LocalMode) Validate() error {
+	if !m.Runtime.IsSameAs(m.Dataplane) {
+		return fmt.Errorf("local mode only for identical runtime and dataplane")
+	}
+	return nil
+}
+
 func (m *LocalMode) RuntimeNamespace(c cluster.Cluster, key client.ObjectKey) string {
 	return key.Namespace
 }
@@ -35,7 +42,9 @@ func (m *LocalMode) AccessValues(ctx ReconcileContext, name string, deleting boo
 	if !ctx.IsSimulate() {
 		m.index.Remove(INDEX_SASECFRET, ctx.GetKey(), secretkey)
 	}
-	return nil, nil
+	return map[string]interface{}{
+		"serviceaccount": name,
+	}, nil
 }
 
 func (m *LocalMode) Prepare(ctx ReconcileContext) reconcile.Problem {

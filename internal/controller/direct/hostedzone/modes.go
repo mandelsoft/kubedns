@@ -7,6 +7,8 @@ import (
 )
 
 type Mode interface {
+	Validate() error
+
 	RuntimeNamespace(c cluster.Cluster, key client.ObjectKey) string
 	RuntimeSecretName(c cluster.Cluster, key client.ObjectKey) string
 	RuntimeDeploymentName(c cluster.Cluster, key client.ObjectKey) string
@@ -21,6 +23,10 @@ type Mode interface {
 
 type ModeImpl struct {
 	*HostedZoneReconciler
+}
+
+func (m *ModeImpl) Validate() error {
+	return nil
 }
 
 func (m *ModeImpl) Cleanup(ctx ReconcileContext, name string) reconcile.Problem {
