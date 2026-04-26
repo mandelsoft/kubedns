@@ -92,7 +92,7 @@ func main() {
 			srvzone.Controller(),
 		).
 		AddComponent(
-			component.WithMappings(servercomp.Server()).MapIndex(servercomp.INDEX, "dnsnames"),
+			component.WithMappings(servercomp.Server()).MapIndex(servercomp.INDEX_ZONENAMES, "dnsnames"),
 		)
 
 	options := &flagutils.DefaultOptionSet{}

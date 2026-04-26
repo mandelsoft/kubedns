@@ -2,7 +2,9 @@ package zonemodel_test
 
 import (
 	"context"
+	"slices"
 
+	"github.com/mandelsoft/goutils/sliceutils"
 	. "github.com/mandelsoft/goutils/testutils"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/internal/controller/server/zonemodel"
@@ -29,6 +31,22 @@ func (i *Index) LookupRelativeDomainName(ctx context.Context, zone zonemodel.Zon
 		return nil, nil
 	}
 	return zoneentries[rel], nil
+}
+
+func (i *Index) LookupIP(ctx context.Context, zone zonemodel.ZoneKey, ip string) ([]corednsv1alpha1.CoreDNSEntry, error) {
+	zoneentries := i.entries[zone]
+	if zoneentries == nil {
+		return nil, nil
+	}
+	var result []corednsv1alpha1.CoreDNSEntry
+	for _, list := range zoneentries {
+		for _, e := range list {
+			if slices.Contains(e.Spec.A, ip) {
+				result = append(result, e)
+			}
+		}
+	}
+	return result, nil
 }
 
 func (i *Index) AddEntry(s zonemodel.Source, entry *corednsv1alpha1.CoreDNSEntry) {
@@ -103,6 +121,7 @@ func init() {
 		Spec: corednsv1alpha1.CoreDNSSpec{
 			DNSNames: []string{"demo.test", "demo.test2"},
 			ZoneRef:  "a",
+			A:        sliceutils.AsSlice("8.8.8.8"),
 		},
 	}
 
@@ -114,6 +133,7 @@ func init() {
 		Spec: corednsv1alpha1.CoreDNSSpec{
 			DNSNames: []string{"test"},
 			ZoneRef:  "a",
+			A:        sliceutils.AsSlice("8.8.8.9"),
 		},
 	}
 
@@ -137,6 +157,7 @@ func init() {
 		Spec: corednsv1alpha1.CoreDNSSpec{
 			DNSNames: []string{"demo"},
 			ZoneRef:  "aa",
+			A:        sliceutils.AsSlice("9.9.9.9"),
 		},
 	}
 
@@ -149,24 +170,24 @@ var _ = Describe("Test Environment", func() {
 	var index *Index
 	var zoneA *zonemodel.Zone
 
-	Context("", func() {
-		BeforeEach(func() {
-			ctx := logrusl.Human().New()
-			ctx.SetDefaultLevel(logging.InfoLevel)
-			logger = ctx.Logger(logging.NewRealm("test"))
-			index = NewIndex()
-			model = zonemodel.New(index)
-			zoneA = model.AddZone(Source, ZoneAKey, ZoneA)
-		})
+	BeforeEach(func() {
+		ctx := logrusl.Human().New()
+		ctx.SetDefaultLevel(logging.InfoLevel)
+		logger = ctx.Logger(logging.NewRealm("test"))
+		index = NewIndex()
+		model = zonemodel.New(index)
+		zoneA = model.AddZone(Source, ZoneAKey, ZoneA)
+	})
 
+	Context("fqdn to record", func() {
 		It("simple entry access", func() {
 			index.AddEntry(Source, EntryA_test)
 
-			Expect(zoneA.Resolve(logger, "test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
-				Zone:      zoneA,
-				ZoneName:  "mandelsoft.de.",
-				Entries:   []*corednsv1alpha1.CoreDNSEntry{EntryA_test},
-				EntryName: "test.mandelsoft.de.",
+			Expect(zoneA.ResolveFQDN(logger, "test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
+				Zone:       zoneA,
+				ZoneNames:  sliceutils.AsSlice("mandelsoft.de."),
+				Entries:    []*corednsv1alpha1.CoreDNSEntry{EntryA_test},
+				EntryNames: sliceutils.AsSlice("test.mandelsoft.de."),
 			}))
 		})
 
@@ -174,11 +195,11 @@ var _ = Describe("Test Environment", func() {
 			index.AddEntry(Source, EntryA_test)
 			index.AddEntry(Source, EntryA_demo)
 
-			Expect(zoneA.Resolve(logger, "test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
-				Zone:      zoneA,
-				ZoneName:  "mandelsoft.de.",
-				Entries:   []*corednsv1alpha1.CoreDNSEntry{EntryA_test},
-				EntryName: "test.mandelsoft.de.",
+			Expect(zoneA.ResolveFQDN(logger, "test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
+				Zone:       zoneA,
+				ZoneNames:  sliceutils.AsSlice("mandelsoft.de."),
+				Entries:    []*corednsv1alpha1.CoreDNSEntry{EntryA_test},
+				EntryNames: sliceutils.AsSlice("test.mandelsoft.de."),
 			}))
 		})
 
@@ -186,11 +207,11 @@ var _ = Describe("Test Environment", func() {
 			index.AddEntry(Source, EntryA_test)
 			index.AddEntry(Source, EntryA_demo)
 
-			Expect(zoneA.Resolve(logger, "demo.test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
-				Zone:      zoneA,
-				ZoneName:  "mandelsoft.de.",
-				Entries:   []*corednsv1alpha1.CoreDNSEntry{EntryA_demo},
-				EntryName: "demo.test.mandelsoft.de.",
+			Expect(zoneA.ResolveFQDN(logger, "demo.test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
+				Zone:       zoneA,
+				ZoneNames:  sliceutils.AsSlice("mandelsoft.de."),
+				Entries:    []*corednsv1alpha1.CoreDNSEntry{EntryA_demo},
+				EntryNames: sliceutils.AsSlice("demo.test.mandelsoft.de."),
 			}))
 		})
 
@@ -199,11 +220,11 @@ var _ = Describe("Test Environment", func() {
 			index.AddEntry(Source, EntryA_test)
 			index.AddEntry(Source, EntryA_demo)
 
-			Expect(zoneA.Resolve(logger, "demo.test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
-				Zone:      zoneAA,
-				ZoneName:  "test.mandelsoft.de.",
-				Entries:   nil,
-				EntryName: "demo.test.mandelsoft.de.",
+			Expect(zoneA.ResolveFQDN(logger, "demo.test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
+				Zone:       zoneAA,
+				ZoneNames:  sliceutils.AsSlice("test.mandelsoft.de."),
+				Entries:    nil,
+				EntryNames: sliceutils.AsSlice("demo.test.mandelsoft.de."),
 			}))
 		})
 
@@ -212,11 +233,11 @@ var _ = Describe("Test Environment", func() {
 			index.AddEntry(Source, EntryA_test)
 			index.AddEntry(Source, EntryAA_demo)
 
-			Expect(zoneA.Resolve(logger, "demo.test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
-				Zone:      zoneAA,
-				ZoneName:  "test.mandelsoft.de.",
-				Entries:   []*corednsv1alpha1.CoreDNSEntry{EntryAA_demo},
-				EntryName: "demo.test.mandelsoft.de.",
+			Expect(zoneA.ResolveFQDN(logger, "demo.test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
+				Zone:       zoneAA,
+				ZoneNames:  sliceutils.AsSlice("test.mandelsoft.de."),
+				Entries:    []*corednsv1alpha1.CoreDNSEntry{EntryAA_demo},
+				EntryNames: sliceutils.AsSlice("demo.test.mandelsoft.de."),
 			}))
 		})
 
@@ -224,12 +245,47 @@ var _ = Describe("Test Environment", func() {
 			index.AddEntry(Source, EntryA_test)
 			index.AddEntry(Source, EntryA_NS)
 
-			Expect(zoneA.Resolve(logger, "demo.nested.test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
-				Zone:      zoneA,
-				ZoneName:  "mandelsoft.de.",
-				Entries:   []*corednsv1alpha1.CoreDNSEntry{EntryA_NS},
-				EntryName: "nested.test.mandelsoft.de.",
+			Expect(zoneA.ResolveFQDN(logger, "demo.nested.test.mandelsoft.de")).To(DeepEqual(&zonemodel.Info{
+				Zone:       zoneA,
+				ZoneNames:  sliceutils.AsSlice("mandelsoft.de."),
+				Entries:    []*corednsv1alpha1.CoreDNSEntry{EntryA_NS},
+				EntryNames: sliceutils.AsSlice("nested.test.mandelsoft.de."),
 			}))
+		})
+	})
+
+	Context("ip to record", func() {
+		It("simple entry access", func() {
+			index.AddEntry(Source, EntryA_test)
+
+			Expect(zoneA.ResolveIP(logger, "8.8.8.9")).To(DeepEqual([]*zonemodel.Info{
+				{
+					Zone:       zoneA,
+					ZoneNames:  sliceutils.AsSlice("mandelsoft.de.", "mandelsoft.org."),
+					Entries:    []*corednsv1alpha1.CoreDNSEntry{EntryA_test},
+					EntryNames: sliceutils.AsSlice("test.mandelsoft.de.", "test.mandelsoft.org."),
+				},
+			}))
+		})
+
+		FIt("forwarded entry access", func() {
+			zoneAA := model.AddZone(Source, ZoneAAKey, ZoneAA)
+			index.AddEntry(Source, EntryA_test)
+			index.AddEntry(Source, EntryAA_demo)
+
+			Expect(zoneA.ResolveIP(logger, "9.9.9.9")).To(DeepEqual([]*zonemodel.Info{
+				{
+					Zone: zoneAA,
+					ZoneNames: sliceutils.AsSlice(
+						"demo.mandelsoft.de.", "demo.mandelsoft.org.",
+						"test.mandelsoft.de.", "test.mandelsoft.org."),
+					Entries: []*corednsv1alpha1.CoreDNSEntry{EntryAA_demo},
+					EntryNames: sliceutils.AsSlice(
+						"demo.demo.mandelsoft.de.", "demo.demo.mandelsoft.org.",
+						"demo.test.mandelsoft.de.", "demo.test.mandelsoft.org."),
+				},
+			}))
+
 		})
 	})
 })

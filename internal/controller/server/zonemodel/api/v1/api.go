@@ -9,14 +9,14 @@ type Error struct {
 }
 
 type Answer struct {
-	Zone    Zone    `json:"zone"`
-	Name    string  `json:"name"`
-	Records Records `json:"records"`
+	Zone    Zone     `json:"zone"`
+	Names   []string `json:"names"`
+	Records Records  `json:"records"`
 }
 
 type Zone struct {
 	NameServers []string `json:"nameservers,omitempty"`
-	Name        string   `json:"name"`
+	Names       []string `json:"names"`
 	EMail       string   `json:"email"`
 	MinimumTTL  int      `json:"minimumTTL"`
 	Expire      int      `json:"expire"`

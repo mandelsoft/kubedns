@@ -120,6 +120,72 @@ a dedicated load-balancer (NLB) type to serve UDP requests.
 If other environments also require such a special handling,
 there is an interface to plug-in such support, but it is not available as part of this project (Feel free to contribute).
 
+## REST-Server API
+
+The REST servers offers an API (API version v1) for looking up 
+
+- full qualified domain names (`api/v1/zones/<cluster id>/<namespace>/<zone name>/<fqdn>`)
+
+  This request also handles local nested zones (definaed by nested hosted zone objects)
+  It returns an `error` answer for IP addresses not in the domain, or an `info` answer, which my provide an empty record list, if there is no such record. The `names`field provide the appropriate matching FQDN. 
+  
+  
+- a reverse lookup for IP addresses (`api/v1/ips/<cluster id>/<namespace>/<zone name>/<ipv1 or ipv6>`)
+
+  It returns an `error` answer for IP addresses not in the domain, or a list of `info` documents, for every matching entry. the `names` field may contain multiple entries, if multiple names are declared in the resource objects. THis gives a complete list of matching names for the IP address.
+
+
+### Answer formats
+
+The answer is always a single JSON document.
+
+#### `error`
+
+In case of an error a JSON document with a field `error` is returned, which contain the error message.
+
+#### `info`
+
+An `info` document includes the following fields:
+
+- `zone`: a zone attribute map with the fields:
+  - `names` *[]string*: the list of matching zone domains (Pleate not, that a hosted zone object might declare more than one DNS name).
+  - `email` *string*: the e-mail address
+  - `minimumTTL` *int*:  the minimul TTL property of the zone
+  - `expire` *int*: the expiration property of the zone
+  - `refresh`*int*: the refresh property of the zone
+- `names` *[]string*: the list of matching FQDNs.
+- `records` *[]record*: the list of found records
+
+#### `record`
+
+A `record` document describes a list of records matching of the same type and includes the following fields:
+
+- `A` *[]ipv4*: list of IPv4 addresses
+- `AAAA` *[]ipv6*: list of IPv6 addresses
+- `TXT` *[]string*: list of text records
+- `SRV` *[]service*: list of services
+- `ǸS` *[]string*: list of name servers
+- `CNAME` *string*: CName entry
+
+#### `service`
+
+A `service` document describes a service entry with the following fields:
+
+- `service` *string*: the service name
+- `records`*[]srvrecord*: list of service record entries
+
+#### `srvrecord`
+
+This is the service description:
+
+- `protocol` *string*: UPD or TCP
+- `priority` *int*: the priority property
+- `weight` *int*: the weight property
+- `port` *int*: the port number
+- `host` *string*: the target name (FQDN)
+- 
+
+
 ## Options
 
 ```

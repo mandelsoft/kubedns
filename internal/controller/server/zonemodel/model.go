@@ -60,6 +60,7 @@ type Source interface {
 
 type Index interface {
 	LookupRelativeDomainName(ctx context.Context, zone ZoneKey, rel string) ([]corednsv1alpha1.CoreDNSEntry, error)
+	LookupIP(ctx context.Context, zone ZoneKey, ip string) ([]corednsv1alpha1.CoreDNSEntry, error)
 }
 
 type Model struct {
@@ -170,14 +171,14 @@ func (z *Zone) Matches(qname string) string {
 }
 
 type Info struct {
-	Zone     *Zone
-	ZoneName string
+	Zone      *Zone
+	ZoneNames []string
 
-	Entries   []*corednsv1alpha1.CoreDNSEntry
-	EntryName string
+	Entries    []*corednsv1alpha1.CoreDNSEntry
+	EntryNames []string
 }
 
-func (z *Zone) Resolve(logger logging.Logger, qname string) (*Info, error) {
+func (z *Zone) ResolveFQDN(logger logging.Logger, qname string) (*Info, error) {
 	z.model.lock.RLock()
 	defer z.model.lock.RUnlock()
 
@@ -225,7 +226,7 @@ nextForward:
 			if len(e.Spec.NS) != 0 {
 				zn = cur
 				logger.Info("found delegated zone {{zonekey}}: {{current}}/{{relative}}", "zonekey", client.ObjectKeyFromObject(&e), "current", cur, "relative", rel)
-				return &Info{Zone: zone, ZoneName: curz, Entries: []*corednsv1alpha1.CoreDNSEntry{&e}, EntryName: cur}, nil
+				return &Info{Zone: zone, ZoneNames: sliceutils.AsSlice(curz), Entries: []*corednsv1alpha1.CoreDNSEntry{&e}, EntryNames: sliceutils.AsSlice(cur)}, nil
 				break
 			}
 		}
@@ -237,5 +238,52 @@ nextForward:
 		entries = append(entries, &e)
 	}
 
-	return &Info{Zone: zone, ZoneName: curz, Entries: entries, EntryName: cur}, nil
+	return &Info{Zone: zone, ZoneNames: sliceutils.AsSlice(curz), Entries: entries, EntryNames: sliceutils.AsSlice(cur)}, nil
+}
+
+func (z *Zone) ResolveIP(logger logging.Logger, ip string) ([]*Info, error) {
+	z.model.lock.RLock()
+	defer z.model.lock.RUnlock()
+
+	return z.resolveIP([]string{""}, logger, ip)
+}
+
+func (z *Zone) resolveIP(fqdns []string, logger logging.Logger, ip string) ([]*Info, error) {
+
+	list, err := z.model.index.LookupIP(nil, z.key, ip)
+	if err != nil {
+		return nil, err
+	}
+
+	fqdns = expand(z.names, fqdns, nil)
+	var result []*Info
+	var entries []*corednsv1alpha1.CoreDNSEntry
+	var names []string
+	if len(list) > 0 {
+		for _, e := range list {
+			logger.Info("found entry {{entry}} for {{zonekey}}/{{ip}}", "entry", client.ObjectKeyFromObject(&e), "zonekey", z.key, "ip", ip)
+			entries = append(entries, &e)
+			names = expand(e.Spec.DNSNames, fqdns, names)
+		}
+		result = append(result, &Info{Zone: z, ZoneNames: fqdns, Entries: entries, EntryNames: names})
+	}
+
+	for _, s := range z.children {
+		list, err := s.resolveIP(fqdns, logger, ip)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, list...)
+	}
+
+	return result, nil
+}
+
+func expand(names []string, fqnds []string, list []string) []string {
+	for _, n := range names {
+		for _, f := range fqnds {
+			list = append(list, dns.Fqdn(n)+f)
+		}
+	}
+	return list
 }
