@@ -4,11 +4,15 @@ import (
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 )
 
+type Answer struct {
+	Error `json:",inline"`
+	Infos []Info `json:"infos"`
+}
 type Error struct {
-	Error string `json:"error"`
+	Error string `json:"error,omitempty"`
 }
 
-type Answer struct {
+type Info struct {
 	Zone    Zone     `json:"zone"`
 	Names   []string `json:"names"`
 	Records Records  `json:"records"`

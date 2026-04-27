@@ -1,7 +1,6 @@
 package zonemodel
 
 import (
-	"context"
 	"fmt"
 	"sync"
 
@@ -59,8 +58,8 @@ type Source interface {
 }
 
 type Index interface {
-	LookupRelativeDomainName(ctx context.Context, zone ZoneKey, rel string) ([]corednsv1alpha1.CoreDNSEntry, error)
-	LookupIP(ctx context.Context, zone ZoneKey, ip string) ([]corednsv1alpha1.CoreDNSEntry, error)
+	LookupRelativeDomainName(src Source, zone ZoneKey, rel string) ([]corednsv1alpha1.CoreDNSEntry, error)
+	LookupIP(src Source, zone ZoneKey, ip string) ([]corednsv1alpha1.CoreDNSEntry, error)
 }
 
 type Model struct {
@@ -218,7 +217,7 @@ nextForward:
 		cur = Join(l, cur)
 		rel = Rdn(Join(l, rel))
 		logger.Info("lookup NS record for {{current}}/{{relative}}", "current", cur, "relative", rel)
-		list, err = zone.model.index.LookupRelativeDomainName(nil, zone.key, rel)
+		list, err = zone.model.index.LookupRelativeDomainName(zone.source, zone.key, rel)
 		if err != nil {
 			return nil, err
 		}
@@ -250,7 +249,7 @@ func (z *Zone) ResolveIP(logger logging.Logger, ip string) ([]*Info, error) {
 
 func (z *Zone) resolveIP(fqdns []string, logger logging.Logger, ip string) ([]*Info, error) {
 
-	list, err := z.model.index.LookupIP(nil, z.key, ip)
+	list, err := z.model.index.LookupIP(z.source, z.key, ip)
 	if err != nil {
 		return nil, err
 	}

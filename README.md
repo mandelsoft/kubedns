@@ -139,6 +139,12 @@ The REST servers offers an API (API version v1) for looking up
 
 The answer is always a single JSON document.
 
+- `error` *string*: in case of an error, this is the only field set.
+- `infos` *[]info*: the field infos provides a list of informational answers.
+
+   For FQDN resolutions the list contains one entry, with a possible empty list of records.
+   For an IP resolutions it may include multiple entries describeing all possible matches with all possible FQDNS. 
+
 #### `error`
 
 In case of an error a JSON document with a field `error` is returned, which contain the error message.

@@ -11,8 +11,8 @@ import (
 
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
+	"github.com/mandelsoft/kubedns/api/server/v1"
 	"github.com/mandelsoft/kubedns/internal/controller/server/zonemodel"
-	v1 "github.com/mandelsoft/kubedns/internal/controller/server/zonemodel/api/v1"
 )
 
 const PATH_IPS = "/api/v1/ips/"
@@ -43,41 +43,41 @@ func (c *Component) handleIPs(w http.ResponseWriter, r *http.Request) {
 		c.SendError(fmt.Errorf("name not in domain"), w, http.StatusBadRequest)
 		return
 	}
-	var answers []*v1.Answer
+	var answer v1.Answer
 
-	for _, info := range infos {
-		var answer v1.Answer
-		answer.Names = info.EntryNames
-		if info.Zone != nil {
+	for _, i := range infos {
+		var info v1.Info
+		info.Names = i.EntryNames
+		if i.Zone != nil {
 			var zone corednsv1alpha1.HostedZone
-			err := info.Zone.GetSource().(cluster.Cluster).Get(context.Background(), info.Zone.GetKey().NamespacedName, &zone)
+			err := i.Zone.GetSource().(cluster.Cluster).Get(context.Background(), i.Zone.GetKey().NamespacedName, &zone)
 			if err != nil {
 				c.SendError(err, w, http.StatusInternalServerError)
 				return
 			}
-			answer.Zone.Names = info.ZoneNames
-			answer.Zone.NameServers = zone.Status.NameServers
-			answer.Zone.EMail = zone.Spec.EMail
-			answer.Zone.MinimumTTL = zone.Spec.MinimumTTL
-			answer.Zone.Expire = zone.Spec.Expire
-			answer.Zone.Refresh = zone.Spec.Refresh
+			info.Zone.Names = i.ZoneNames
+			info.Zone.NameServers = zone.Status.NameServers
+			info.Zone.EMail = zone.Spec.EMail
+			info.Zone.MinimumTTL = zone.Spec.MinimumTTL
+			info.Zone.Expire = zone.Spec.Expire
+			info.Zone.Refresh = zone.Spec.Refresh
 		}
-		for _, r := range info.Entries {
-			CopyR(r.Spec.NS, &answer.Records.NS)
-			CopyR(r.Spec.A, &answer.Records.A)
-			CopyR(r.Spec.AAAA, &answer.Records.AAAA)
-			CopyR(r.Spec.TXT, &answer.Records.TXT)
-			if answer.Records.CNAME == "" {
-				answer.Records.CNAME = r.Spec.CNAME
+		for _, r := range i.Entries {
+			CopyR(r.Spec.NS, &info.Records.NS)
+			CopyR(r.Spec.A, &info.Records.A)
+			CopyR(r.Spec.AAAA, &info.Records.AAAA)
+			CopyR(r.Spec.TXT, &info.Records.TXT)
+			if info.Records.CNAME == "" {
+				info.Records.CNAME = r.Spec.CNAME
 			}
 			if r.Spec.SRV != nil {
-				answer.Records.SRV = append(answer.Records.SRV, *r.Spec.SRV)
+				info.Records.SRV = append(info.Records.SRV, *r.Spec.SRV)
 			}
 		}
-		answers = append(answers, &answer)
+		answer.Infos = append(answer.Infos, info)
 	}
 
-	d, _ := json.Marshal(answers)
+	d, _ := json.Marshal(&answer)
 	_, err = io.Copy(w, bytes.NewReader(d))
 	if err != nil {
 		c.logger.Error("%s", err.Error())

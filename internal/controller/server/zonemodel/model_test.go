@@ -1,7 +1,6 @@
 package zonemodel_test
 
 import (
-	"context"
 	"slices"
 
 	"github.com/mandelsoft/goutils/sliceutils"
@@ -25,7 +24,7 @@ func NewIndex() *Index {
 	return &Index{entries: make(map[zonemodel.ZoneKey]map[string][]corednsv1alpha1.CoreDNSEntry)}
 }
 
-func (i *Index) LookupRelativeDomainName(ctx context.Context, zone zonemodel.ZoneKey, rel string) ([]corednsv1alpha1.CoreDNSEntry, error) {
+func (i *Index) LookupRelativeDomainName(src zonemodel.Source, zone zonemodel.ZoneKey, rel string) ([]corednsv1alpha1.CoreDNSEntry, error) {
 	zoneentries := i.entries[zone]
 	if zoneentries == nil {
 		return nil, nil
@@ -33,7 +32,7 @@ func (i *Index) LookupRelativeDomainName(ctx context.Context, zone zonemodel.Zon
 	return zoneentries[rel], nil
 }
 
-func (i *Index) LookupIP(ctx context.Context, zone zonemodel.ZoneKey, ip string) ([]corednsv1alpha1.CoreDNSEntry, error) {
+func (i *Index) LookupIP(src zonemodel.Source, zone zonemodel.ZoneKey, ip string) ([]corednsv1alpha1.CoreDNSEntry, error) {
 	zoneentries := i.entries[zone]
 	if zoneentries == nil {
 		return nil, nil

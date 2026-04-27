@@ -8,12 +8,14 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	"github.com/mandelsoft/kubecrtutils/component"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
+	"github.com/mandelsoft/kubedns/api/server/v1"
 	"github.com/mandelsoft/kubedns/internal/controller/server/zonemodel"
-	"github.com/mandelsoft/kubedns/internal/controller/server/zonemodel/api/v1"
 	"github.com/mandelsoft/logging"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -43,14 +45,14 @@ func (c *Component) GetModel() *zonemodel.Model {
 	return c.model
 }
 
-func (c *Component) LookupRelativeDomainName(ctx context.Context, zk zonemodel.ZoneKey, rel string) ([]corednsv1alpha1.CoreDNSEntry, error) {
+func (c *Component) LookupRelativeDomainName(src zonemodel.Source, zk zonemodel.ZoneKey, rel string) ([]corednsv1alpha1.CoreDNSEntry, error) {
 	c.Info("lookup entries for zone {{key}} rdn {{rdn}}", "key", zk, "rdn", rel)
-	return c.indexByName.GetTyped(ctx, zk.Namespace, IndexKey(zk, rel))
+	return c.indexByName.GetTyped(clustercontext.WithCluster(context.Background(), generics.Cast[cluster.Cluster](src)), zk.Namespace, IndexKey(zk, rel))
 }
 
-func (c *Component) LookupIP(ctx context.Context, zk zonemodel.ZoneKey, ip string) ([]corednsv1alpha1.CoreDNSEntry, error) {
+func (c *Component) LookupIP(src zonemodel.Source, zk zonemodel.ZoneKey, ip string) ([]corednsv1alpha1.CoreDNSEntry, error) {
 	c.Info("lookup entries for zone {{key}} ip {{ip}}", "key", zk, "ip", ip)
-	return c.indexByIP.GetTyped(ctx, zk.Namespace, IndexKey(zk, ip))
+	return c.indexByIP.GetTyped(clustercontext.WithCluster(context.Background(), generics.Cast[cluster.Cluster](src)), zk.Namespace, IndexKey(zk, ip))
 }
 
 func IndexKey(zk zonemodel.ZoneKey, rdn string) string {
