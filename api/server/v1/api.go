@@ -6,7 +6,7 @@ import (
 
 type Answer struct {
 	Error `json:",inline"`
-	Infos []Info `json:"infos"`
+	Infos []*Info `json:"infos"`
 }
 type Error struct {
 	Error string `json:"error,omitempty"`
@@ -19,15 +19,20 @@ type Info struct {
 }
 
 type Zone struct {
+	SerialId uint32 `json:"serialId"`
+
 	NameServers []string `json:"nameservers,omitempty"`
 	Names       []string `json:"names"`
 	EMail       string   `json:"email"`
 	MinimumTTL  int      `json:"minimumTTL"`
 	Expire      int      `json:"expire"`
 	Refresh     int      `json:"refresh"`
+	Retry       int      `json:"retry"`
 }
 
 type Records struct {
+	// +optional
+	TTL int `json:"ttl,omitempty"`
 	// +optional
 	A []string `json:"A,omitempty"`
 	// +optional

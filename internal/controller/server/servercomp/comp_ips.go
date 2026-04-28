@@ -2,15 +2,12 @@ package servercomp
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
-	"github.com/mandelsoft/kubecrtutils/cluster"
-	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/api/server/v1"
 	"github.com/mandelsoft/kubedns/internal/controller/server/zonemodel"
 )
@@ -46,33 +43,10 @@ func (c *Component) handleIPs(w http.ResponseWriter, r *http.Request) {
 	var answer v1.Answer
 
 	for _, i := range infos {
-		var info v1.Info
-		info.Names = i.EntryNames
-		if i.Zone != nil {
-			var zone corednsv1alpha1.HostedZone
-			err := i.Zone.GetSource().(cluster.Cluster).Get(context.Background(), i.Zone.GetKey().NamespacedName, &zone)
-			if err != nil {
-				c.SendError(err, w, http.StatusInternalServerError)
-				return
-			}
-			info.Zone.Names = i.ZoneNames
-			info.Zone.NameServers = zone.Status.NameServers
-			info.Zone.EMail = zone.Spec.EMail
-			info.Zone.MinimumTTL = zone.Spec.MinimumTTL
-			info.Zone.Expire = zone.Spec.Expire
-			info.Zone.Refresh = zone.Spec.Refresh
-		}
-		for _, r := range i.Entries {
-			CopyR(r.Spec.NS, &info.Records.NS)
-			CopyR(r.Spec.A, &info.Records.A)
-			CopyR(r.Spec.AAAA, &info.Records.AAAA)
-			CopyR(r.Spec.TXT, &info.Records.TXT)
-			if info.Records.CNAME == "" {
-				info.Records.CNAME = r.Spec.CNAME
-			}
-			if r.Spec.SRV != nil {
-				info.Records.SRV = append(info.Records.SRV, *r.Spec.SRV)
-			}
+		info, err := prepareInfo(i)
+		if err != nil {
+			c.SendError(err, w, http.StatusInternalServerError)
+			return
 		}
 		answer.Infos = append(answer.Infos, info)
 	}

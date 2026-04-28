@@ -48,8 +48,8 @@ manifests-orig: controller-gen ## Generate WebhookConfiguration, ClusterRole and
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	"$(CONTROLLER_GEN)" crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	"$(CONTROLLER_GEN)" rbac:roleName=manager-dataplane paths="./internal/controller/hostedzone/dataplane" output:rbac:artifacts:config=config/rbac/dataplane
-	"$(CONTROLLER_GEN)" rbac:roleName=manager-runtime paths="./internal/controller/hostedzone/runtime" output:rbac:artifacts:config=config/rbac/runtime
+	"$(CONTROLLER_GEN)" rbac:roleName=manager-dataplane paths="./internal/controller/direct/hostedzone/dataplane" output:rbac:artifacts:config=config/rbac/dataplane
+	"$(CONTROLLER_GEN)" rbac:roleName=manager-runtime paths="./internal/controller/direct/hostedzone/runtime" output:rbac:artifacts:config=config/rbac/runtime
 	"$(CONTROLLER_GEN)" rbac:roleName=manager-runtime paths="./api/..." output:rbac:artifacts:config=config/rbac
 
 

@@ -79,6 +79,10 @@ type CoreDNSSpec struct {
 
 	// DNSNames is a list of DNSNames
 	DNSNames []string `json:"dnsNames"`
+
+	// +optional
+	TTL int `json:"TTL,omitempty"`
+
 	// +optional
 	A []string `json:"A,omitempty"`
 	// +optional

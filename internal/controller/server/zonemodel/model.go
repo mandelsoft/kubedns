@@ -2,6 +2,7 @@ package zonemodel
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 
 	"github.com/mandelsoft/goutils/sliceutils"
@@ -104,6 +105,11 @@ func (m *Model) AddZone(s Source, key ZoneKey, zone *corednsv1alpha1.HostedZone)
 			}
 		}
 	}
+	id, err := strconv.ParseUint(zone.ObjectMeta.ResourceVersion, 10, 64)
+	if err != nil {
+		id = 653432456
+	}
+	old.serialId = uint32(id)
 
 	if old.parent != nil {
 		if old.parent.key.Name != zone.Spec.ParentRef {
@@ -129,6 +135,11 @@ func (m *Model) AddZone(s Source, key ZoneKey, zone *corednsv1alpha1.HostedZone)
 	} else {
 		old.names = sliceutils.Transform(zone.Spec.DomainNames, Rdn)
 	}
+
+	for parent != nil {
+		parent.serialId = old.serialId
+		parent = parent.parent
+	}
 	return old
 }
 
@@ -136,6 +147,7 @@ func (m *Model) AddZone(s Source, key ZoneKey, zone *corednsv1alpha1.HostedZone)
 
 type Zone struct {
 	model      *Model
+	serialId   uint32
 	key        ZoneKey
 	source     Source
 	parent     *Zone
@@ -146,6 +158,10 @@ type Zone struct {
 
 func NewZone(m *Model, s Source, key ZoneKey) *Zone {
 	return &Zone{model: m, key: key, source: s, children: make(map[string]*Zone)}
+}
+
+func (z *Zone) GetSerialId() uint32 {
+	return z.serialId
 }
 
 func (z *Zone) GetKey() ZoneKey {
@@ -225,7 +241,7 @@ nextForward:
 			if len(e.Spec.NS) != 0 {
 				zn = cur
 				logger.Info("found delegated zone {{zonekey}}: {{current}}/{{relative}}", "zonekey", client.ObjectKeyFromObject(&e), "current", cur, "relative", rel)
-				return &Info{Zone: zone, ZoneNames: sliceutils.AsSlice(curz), Entries: []*corednsv1alpha1.CoreDNSEntry{&e}, EntryNames: sliceutils.AsSlice(cur)}, nil
+				return &Info{Zone: nil, ZoneNames: sliceutils.AsSlice(cur), Entries: []*corednsv1alpha1.CoreDNSEntry{&e}, EntryNames: sliceutils.AsSlice(cur)}, nil
 				break
 			}
 		}

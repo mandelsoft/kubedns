@@ -39,18 +39,36 @@ func ValidateEntryData(e *corednsv1alpha1.CoreDNSEntry) error {
 		}
 	}
 
+	for _, ns := range e.Spec.NS {
+		if !IsValidFQDN(ns) {
+			err = errors2.Join(err, fmt.Errorf("invalid NS record %q", ns))
+		}
+	}
+
 	if len(e.Spec.CNAME) > 0 {
-		// TODO: validate cname
+		if !IsValidFQDN(e.Spec.CNAME) {
+			err = errors2.Join(err, fmt.Errorf("invalid CNAME record %q", e.Spec.CNAME))
+		}
 	}
 
 	if len(e.Spec.A) == 0 && len(e.Spec.AAAA) == 0 && len(e.Spec.CNAME) == 0 && len(e.Spec.TXT) == 0 && len(e.Spec.NS) == 0 && (e.Spec.SRV == nil || len(e.Spec.SRV.Records) == 0) {
 		err = errors2.Join(err, fmt.Errorf("no record defined"))
 	}
+
+	if len(e.Spec.NS) > 0 {
+		if len(e.Spec.A) != 0 || len(e.Spec.AAAA) != 0 || len(e.Spec.CNAME) != 0 || len(e.Spec.TXT) != 0 || (e.Spec.SRV != nil && len(e.Spec.SRV.Records) != 0) {
+			err = errors2.Join(err, fmt.Errorf("NS records cannot be combined with other ones"))
+		}
+	}
+	
 	if e.Spec.SRV != nil {
 		if len(e.Spec.SRV.Records) != 0 && len(e.Spec.SRV.Service) == 0 {
 			err = errors2.Join(err, fmt.Errorf("service name required for SRV record"))
 		}
 		for i, r := range e.Spec.SRV.Records {
+			if !IsValidFQDN(r.Host) {
+				err = errors2.Join(err, fmt.Errorf("invalid host %q for SRV record %d", r.Host, i))
+			}
 			if r.Protocol != "TCP" && r.Protocol != "UDP" {
 				err = errors2.Join(err, fmt.Errorf("invalid protocol %q for SRV record %d", r.Protocol, i))
 			}

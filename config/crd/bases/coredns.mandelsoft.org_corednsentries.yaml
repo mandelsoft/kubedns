@@ -114,6 +114,8 @@ spec:
                 - records
                 - service
                 type: object
+              TTL:
+                type: integer
               TXT:
                 items:
                   type: string
