@@ -22,7 +22,7 @@ type Request struct {
 }
 
 func (r *Request) Reconcile() reconcile.Problem {
-	zk := zonemodel.ZoneKeyFromObject(r.ClusterName, r.Object)
+	zk := zonemodel.ZoneKeyFromObject(r.Cluster.GetId(), r.Object)
 
 	info, ok, prob := common.GetRootInfo(r, r, r, r.Object, nil)
 	if prob != nil {
@@ -71,7 +71,7 @@ func (r *Request) ReconcileDeleting() reconcile.Problem {
 }
 
 func (r *Request) ReconcileDeleted() reconcile.Problem {
-	zk := zonemodel.NewZoneKey(r.ClusterName, r.Request.Namespace, r.Request.Name)
+	zk := zonemodel.NewZoneKey(r.Cluster.GetId(), r.Request.Namespace, r.Request.Name)
 	r.Info("delete {{key}} from model", "key", zk)
 	r.settings.model.RemoveZone(zk)
 	r.TriggerStatusChanged()

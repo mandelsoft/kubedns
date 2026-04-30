@@ -46,7 +46,7 @@ func Render(manifests map[string][]byte, values map[string]interface{}) (datapla
 			if m["manifest"] == nil {
 				err = retrieve(ctx, k, result, &dataplane, &runtime)
 			} else {
-				err = retrieve(ctx, k, result, &dataplane, &runtime)
+				err = retrieve(ctx, k, m["manifest"], &dataplane, &runtime)
 			}
 			if err != nil {
 				return nil, nil, err

@@ -69,13 +69,14 @@ func main() {
 		MapIndex(direct.IndexKeyEntryZone, IndexKeyEntryZone).
 		MapIndex(direct.IndexKeyZoneParent, IndexKeyZoneParent)
 
-	def := ctrlmgmt.Define(corednsv1alpha1.GroupVersion.Group, "runtime").
+	def := ctrlmgmt.Define(corednsv1alpha1.GroupVersion.Group, cluster.DEFAULT, "runtime", "target", "dataplane", "source").
 		WithScheme(scheme).
 		AddCluster(
 			cluster.Define("runtime", "runtime cluster").WithFallback("dataplane"),
 			cluster.DefineFleet("dataplane", "api cluster for functional controllers", kcp.Type()).WithFallback("target"),
 			cluster.DefineFleet("source", "user api cluster", kcp.Type()).WithFallback("target"),
 			cluster.Define("target", "replication target").WithFallback(cluster.DEFAULT),
+			cluster.DefineFleet(cluster.DEFAULT, "default cluster as fallback for target", kcp.Type()),
 		).
 		AddController(
 			controller.WithMappings(hostedzone.Controller()).

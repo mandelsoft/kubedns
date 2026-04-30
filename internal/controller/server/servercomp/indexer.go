@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/goutils/sliceutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/component"
@@ -17,7 +18,7 @@ import (
 )
 
 func indexerFactoryNames(ctx context.Context, logger logging.Logger, set types.Clusters) (cacheindex.TypedIndexerFunc[*corednsv1alpha1.CoreDNSEntry], error) {
-	opts := component.DefinitionFromContext(ctx).GetOptions().(*Factory)
+	opts := component.FromContext(ctx).GetOptions().(*Factory)
 
 	return func(obj *corednsv1alpha1.CoreDNSEntry) []string {
 		if obj.Spec.ZoneRef == "" {
@@ -49,8 +50,10 @@ func indexerFactoryNames(ctx context.Context, logger logging.Logger, set types.C
 	}, nil
 }
 
+var SerialKey any = generics.PointerTo("dns.serial.cache")
+
 func indexerFactoryIPs(ctx context.Context, logger logging.Logger, set types.Clusters) (cacheindex.TypedIndexerFunc[*corednsv1alpha1.CoreDNSEntry], error) {
-	opts := component.DefinitionFromContext(ctx).GetOptions().(*Factory)
+	opts := component.FromContext(ctx).GetOptions().(*Factory)
 
 	return func(obj *corednsv1alpha1.CoreDNSEntry) []string {
 		if obj.Spec.ZoneRef == "" {
