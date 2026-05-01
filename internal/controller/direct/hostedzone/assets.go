@@ -8,9 +8,11 @@ import (
 	"io/fs"
 	"strings"
 
+	"github.com/mandelsoft/goutils/funcs"
+	"github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/pkg/render"
 	"github.com/mandelsoft/logging"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //go:embed assets
@@ -56,66 +58,99 @@ func TestRenderManifests(logger logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	ctx := NewReconcileContext(context.Background(), logger, "http://api.server", "testcluster", "aws", client.ObjectKey{Name: "myzone", Namespace: "default"})
+
+	obj := &v1alpha1.HostedZone{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.HostedZoneSpec{
+			DomainNames: []string{
+				"test.mandelsoft.org",
+				"test.mandelsoft.de",
+			},
+		},
+	}
+	ctx := NewReconcileContext(context.Background(), logger, "http://api.server", "testcluster", "aws", obj)
 	ctx.Simulate = true
 
 	r := &HostedZoneReconciler{
-		Options: NewOptions(),
-	}
-	values, err := ctx.Values(NewLocalMode(r), false)
-	if err != nil {
-		return fmt.Errorf("get local mode values: %w", err)
-	}
-	dataplane, runtime, err := render.Render(manifests, values)
-	if err != nil {
-		return fmt.Errorf("local mode rendering: %w", err)
+		Options: &Options{
+			RestEndpoint: "http:/localhost:8085",
+			Kubedyndns:   "kubedyndns:latest",
+			Restdyndns:   "restdyndns:latest",
+		},
 	}
 
-	fmt.Printf("*** local mode:\n")
+	err = handleCombi(ctx, "local", manifests, r, NewDataplaneServer, NewLocalMode)
+	if err != nil {
+		return err
+	}
+	err = handleCombi(ctx, "runtime server", manifests, r, NewRestAPIServer, NewRuntimeMode)
+	if err != nil {
+		return err
+	}
+	r.Options.RuntimeNamespace = ""
+	err = handleCombi(ctx, "runtime", manifests, r, NewDataplaneServer, NewRuntimeMode)
+	if err != nil {
+		return err
+	}
+	r.Options.RuntimeNamespace = "dns-namespace"
+	err = handleCombi(ctx, "runtime namespace", manifests, r, NewDataplaneServer, NewRuntimeMode)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func handleCombi(ctx ReconcileContext, name string, manifests map[string][]byte, r *HostedZoneReconciler, s ServerModeFactory, m ModeFactory) error {
+	r.ServerMode = funcs.Must(s(nil, r.Options))
+	r.Mode = m(r)
+	values, err := ctx.Values(r.Mode, false)
+	if err != nil {
+		return fmt.Errorf("get %s mode values: %w", name, err)
+	}
+	rendered, err := render.Render(manifests, values)
+	if err != nil {
+		return fmt.Errorf("%s mode rendering: %w", name, err)
+	}
+	if len(rendered.Other) > 0 {
+		return fmt.Errorf("%s mode rendering: provided non-manifest", name)
+	}
+
+	fmt.Printf("***************** %s mode ******************\n", name)
 	vd, _ := json.Marshal(values)
 	fmt.Printf("values: %s\n", string(vd))
 	fmt.Printf("dataplane manifests:\n")
-	for k, v := range dataplane {
+	for k, v := range rendered.Dataplane {
 		fmt.Printf("- %s:\n", k)
 		fmt.Printf("    %s\n", strings.Replace(string(v), "\n", "\n    ", -1))
 	}
 	fmt.Printf("runtime manifests:\n")
-	for k, v := range runtime {
-		fmt.Printf("- %s:\n", k)
-		fmt.Printf("    %s\n", strings.Replace(string(v), "\n", "\n    ", -1))
-	}
-
-	//////////////
-	r.Options.RuntimeNamespace = ""
-	values, err = ctx.Values(NewRuntimeMode(r), false)
-	if err != nil {
-		return fmt.Errorf("get runtime mode values: %w", err)
-	}
-	dataplane, runtime, err = render.Render(manifests, values)
-	if err != nil {
-		return fmt.Errorf("runtime mode rendering: %w", err)
-	}
-
-	r.Options.RuntimeNamespace = "dns-runtime"
-	values, err = ctx.Values(NewRuntimeMode(r), false)
-	if err != nil {
-		return fmt.Errorf("get central runtime mode values: %w", err)
-	}
-	dataplane, runtime, err = render.Render(manifests, values)
-	if err != nil {
-		return fmt.Errorf("cenbtral runtime mode rendering: %w", err)
-	}
-
-	fmt.Printf("*** remote mode:\n")
-	fmt.Printf("dataplane manifests:\n")
-	for k, v := range dataplane {
-		fmt.Printf("- %s:\n", k)
-		fmt.Printf("    %s\n", strings.Replace(string(v), "\n", "\n    ", -1))
-	}
-	fmt.Printf("runtime manifests:\n")
-	for k, v := range runtime {
+	for k, v := range rendered.Runtime {
 		fmt.Printf("- %s:\n", k)
 		fmt.Printf("    %s\n", strings.Replace(string(v), "\n", "\n    ", -1))
 	}
 	return nil
+}
+
+func GetManifestsFromDir(d string) (map[string][]byte, error) {
+	manifests := make(map[string][]byte)
+	entries, err := fs.ReadDir(content, d)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			if strings.HasSuffix(e.Name(), ".yaml") || strings.HasSuffix(e.Name(), ".yml") {
+				data, err := content.ReadFile(d + "/" + e.Name())
+				if err != nil {
+					return nil, err
+				}
+				manifests[e.Name()] = data
+			}
+		}
+	}
+	return manifests, nil
 }

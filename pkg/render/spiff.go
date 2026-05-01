@@ -13,7 +13,21 @@ import (
 	"github.com/mandelsoft/spiff/yaml"
 )
 
-func Render(manifests map[string][]byte, values map[string]interface{}) (dataplane map[string][]byte, runtime map[string][]byte, err error) {
+type Rendered struct {
+	Dataplane map[string][]byte
+	Runtime   map[string][]byte
+	Other     map[string][]byte
+}
+
+func newRendered() *Rendered {
+	return &Rendered{
+		Dataplane: make(map[string][]byte),
+		Runtime:   make(map[string][]byte),
+		Other:     make(map[string][]byte),
+	}
+}
+
+func Render(manifests map[string][]byte, values map[string]interface{}, key ...string) (rendered *Rendered, err error) {
 	values = map[string]interface{}{"values": values}
 	ctx, err := spiffing.New().
 		WithFileSystem(nil).
@@ -22,60 +36,61 @@ func Render(manifests map[string][]byte, values map[string]interface{}) (datapla
 		WithValues(values)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	dataplane = map[string][]byte{}
-	runtime = map[string][]byte{}
+	rendered = newRendered()
 
 	for k, v := range manifests {
 		src := spiffing.NewSourceData(k, v)
 		templ, err := ctx.UnmarshalSource(src)
 		if err != nil {
-			return nil, nil, fmt.Errorf("%s: %w", k, err)
+			return nil, fmt.Errorf("%s: %w", k, err)
 		}
 		result, err := ctx.Cascade(templ, nil)
 		if err != nil {
-			return nil, nil, fmt.Errorf("%s: %w", k, err)
+			return nil, fmt.Errorf("%s: %w", k, err)
 		}
 
 		m, ok := result.Value().(map[string]yaml.Node)
 		if !ok {
-			return nil, nil, fmt.Errorf("%s: no map on root level", k)
+			return nil, fmt.Errorf("%s: no map on root level", k)
 		}
-		if m["manifests"] == nil {
+		if len(key) > 0 {
+			err = retrieve(ctx, k, m[key[0]], rendered)
+		} else if m["manifests"] == nil {
 			if m["manifest"] == nil {
-				err = retrieve(ctx, k, result, &dataplane, &runtime)
+				err = retrieve(ctx, k, result, rendered)
 			} else {
-				err = retrieve(ctx, k, m["manifest"], &dataplane, &runtime)
+				err = retrieve(ctx, k, m["manifest"], rendered)
 			}
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 		} else {
 			switch e := m["manifests"].Value().(type) {
 			case map[string]yaml.Node:
 				// handle map
 				for n, v := range e {
-					err = retrieve(ctx, k+"::"+n, v, &dataplane, &runtime)
+					err = retrieve(ctx, k+"::"+n, v, rendered)
 					if err != nil {
-						return nil, nil, err
+						return nil, err
 					}
 				}
 			case []yaml.Node:
 				// handle list
 				for n, v := range e {
-					err = retrieve(ctx, k+"::"+strconv.Itoa(n), v, &dataplane, &runtime)
+					err = retrieve(ctx, k+"::"+strconv.Itoa(n), v, rendered)
 					if err != nil {
-						return nil, nil, err
+						return nil, err
 					}
 				}
 			default:
-				return nil, nil, fmt.Errorf("%s: manifests must be list or map", k)
+				return nil, fmt.Errorf("%s: manifests must be list or map", k)
 			}
 		}
 	}
-	apply_hashes(runtime)
-	return dataplane, runtime, nil
+	apply_hashes(rendered.Runtime)
+	return rendered, nil
 }
 
 func apply_hashes(manifests map[string][]byte) error {
@@ -125,44 +140,50 @@ func apply_hashes(manifests map[string][]byte) error {
 	return nil
 }
 
-func retrieve(ctx spiffing.Spiff, name string, result yaml.Node, dataplane *map[string][]byte, runtime *map[string][]byte) error {
+func retrieve(ctx spiffing.Spiff, name string, result yaml.Node, rendered *Rendered) error {
 	data, err := ctx.Marshal(result)
 	if err != nil {
 		return err
 	}
 
 	manifest, ok := result.Value().(map[string]spiffing.Node)
-	if !ok {
-		return fmt.Errorf("%s: no map on root level", name)
-	}
-	if manifest["metadata"] != nil {
-		metadata := manifest["metadata"]
-		if metadata != nil {
-			m, ok := metadata.Value().(map[string]spiffing.Node)
-			if !ok {
-				return fmt.Errorf("%s: invalid metadata field", name)
-			}
-			l := m["labels"]
-			if l != nil {
-				m, ok := l.Value().(map[string]spiffing.Node)
+	if ok {
+		if len(manifest) == 0 {
+			return nil
+		}
+		if manifest["metadata"] != nil {
+			metadata := manifest["metadata"]
+			if metadata != nil {
+				m, ok := metadata.Value().(map[string]spiffing.Node)
 				if !ok {
-					return fmt.Errorf("%s: invalid labels field", name)
+					return fmt.Errorf("%s: invalid metadata field", name)
 				}
-				if m["target"] != nil {
-					s, ok := m["target"].Value().(string)
+				l := m["labels"]
+				if l != nil {
+					m, ok := l.Value().(map[string]spiffing.Node)
 					if !ok {
-						return fmt.Errorf("%s: labels \"target\" must be string", name)
+						return fmt.Errorf("%s: invalid labels field", name)
 					}
-					if s == "runtime" {
-						(*runtime)[name] = data
-						return nil
+					if m["target"] != nil {
+						s, ok := m["target"].Value().(string)
+						if !ok {
+							return fmt.Errorf("%s: labels \"target\" must be string", name)
+						}
+						if s == "runtime" {
+							rendered.Runtime[name] = data
+							return nil
+						}
 					}
 				}
 			}
 		}
-	}
-	if manifest["kind"] != nil {
-		(*dataplane)[name] = data
+		if manifest["kind"] != nil {
+			rendered.Dataplane[name] = data
+		} else {
+			rendered.Other[name] = data
+		}
+	} else {
+		rendered.Other[name] = data
 	}
 	return nil
 }

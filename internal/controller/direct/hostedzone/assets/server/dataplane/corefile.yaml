@@ -1,0 +1,17 @@
+corefile: |
+  .:53 {
+    errors
+    health
+    ready
+    cache 30
+    kubedyndns . {
+      mode Primary
+      zoneobject (( values.dataplane.zone ))
+      namespaces (( values.dataplane.namespace ))
+      transitive
+      slave
+      (( (values.runtime.secret.name != "" ) ? "endpoint " values.dataplane.server  :"" ))
+      (( (values.runtime.secret.name != "" ) ? "token /etc/coredns/access/token /etc/coredns/access/ca.crt" :"" ))
+      ttl 30
+    }
+  }

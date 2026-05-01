@@ -40,10 +40,14 @@ func (m *LocalMode) RuntimeDeploymentName(c cluster.Cluster, key client.ObjectKe
 func (m *LocalMode) AccessValues(ctx ReconcileContext, name string, deleting bool) (map[string]interface{}, error) {
 	secretkey := client.ObjectKey{Namespace: ctx.GetKey().Namespace, Name: name}
 	if !ctx.IsSimulate() {
-		m.index.Remove(INDEX_SASECFRET, ctx.GetKey(), secretkey)
+		m.index.Remove(INDEX_SASECRET, ctx.GetKey(), secretkey)
+	}
+	if !m.ServerMode().RequireDataplaneAccess() {
+		return nil, nil
 	}
 	return map[string]interface{}{
-		"serviceaccount": name,
+		"serviceaccount":               name,
+		"automountServiceAccountToken": true,
 	}, nil
 }
 

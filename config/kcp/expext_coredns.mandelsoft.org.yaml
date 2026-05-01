@@ -1,0 +1,32 @@
+apiVersion: apis.kcp.io/v1alpha2
+kind: APIExport
+metadata:
+  name: coredns.mandelsoft.org
+spec:
+  resources:
+    - group: coredns.mandelsoft.org
+      name: hostedzones
+      schema: v1alpha1.hostedzones.coredns.mandelsoft.org
+      storage:
+        crd: {}
+    - group: coredns.mandelsoft.org
+      name: corednsentries
+      schema: v1alpha1.corednsentries.coredns.mandelsoft.org
+      storage:
+        crd: {}
+  permissionClaims:
+    - group: ""
+      resource: events
+      verbs: [ "create", "patch" ]
+    - group: ""
+      resource: serviceaccounts
+      verbs: [ "*" ]
+    - group: ""
+      resource: secrets
+      verbs: [ "*" ]
+    - group: "rbac.authorization.k8s.io"
+      resource: roles
+      verbs: [ "*" ]
+    - group: "rbac.authorization.k8s.io"
+      resource: rolebindings
+      verbs: [ "*" ]

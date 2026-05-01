@@ -1,16 +1,20 @@
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: (( values.dataplane.name ))
-  namespace: (( values.dataplane.namespace ))
-  labels:
-    target: dataplane
-    app: (( values.dataplane.label ))
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: (( values.dataplane.name ))
-subjects:
-  - kind: ServiceAccount
+resource:
+  <<<: (( &temporary ))
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
     name: (( values.dataplane.name ))
     namespace: (( values.dataplane.namespace ))
+    labels:
+      target: dataplane
+      app: (( values.dataplane.label ))
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: (( values.dataplane.name ))
+  subjects:
+    - kind: ServiceAccount
+      name: (( values.dataplane.name ))
+      namespace: (( values.dataplane.namespace ))
+
+manifest: (( optional(values.dataplane.required, resource) ))

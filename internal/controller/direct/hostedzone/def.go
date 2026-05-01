@@ -33,7 +33,7 @@ import (
 	sigreconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const INDEX_SASECFRET = "serviceaccount-secret"
+const INDEX_SASECRET = "serviceaccount-secret"
 
 func Controller() controller.Definition {
 	return controller.Define[*corednsv1alpha1.HostedZone](direct.ControllerHostedzone, "dataplane", &ReconcilerFactory{}).
@@ -54,7 +54,7 @@ func secretTriggerFactory(ctx context.Context, cntr types.Controller) (handler.T
 	return handler.LiftToCluster(func(ctx context.Context, obj *corev1.Secret) []sigreconcile.Request {
 		var trigger []sigreconcile.Request
 		key := client.ObjectKeyFromObject(obj)
-		users := r.index.UsersFor(INDEX_SASECFRET, key)
+		users := r.index.UsersFor(INDEX_SASECRET, key)
 		if len(users) > 0 {
 			log.Info("change of service account secret {{secret}} triggers {{amount}} zones",
 				"secret", key,

@@ -7,21 +7,4 @@ metadata:
     target: runtime
     app: (( values.runtime.label ))
 data:
-  # The key name here ('Corefile') will be the filename in the volume mount
-  Corefile: |
-    .:53 {
-      errors
-      health
-      ready
-      cache 30
-      kubedyndns . {
-        mode Primary
-        zoneobject (( values.dataplane.zone ))
-        namespaces (( values.dataplane.namespace ))
-        transitive
-        slave
-        (( (values.runtime.secret.name != "" ) ? "endpoint " values.dataplane.server  :"" ))
-        (( (values.runtime.secret.name != "" ) ? "token /etc/coredns/access/token /etc/coredns/access/ca.crt" :"" ))
-        ttl 30
-      }
-    }
+  Corefile: (( values.runtime.corefile ))

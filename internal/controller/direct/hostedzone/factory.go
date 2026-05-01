@@ -83,7 +83,12 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 	if err := r.Mode.Validate(); err != nil {
 		return nil, err
 	}
-	
+
+	r.ServerMode, err = NewDataplaneServer(ctx, r.Options)
+	if err != nil {
+		return nil, err
+	}
+
 	if r.IsSeparateRuntime() {
 		r.Info("setting up secret watch for serviceaccount secrets for separated runtime access")
 	}

@@ -1,0 +1,13 @@
+corefile: |
+  .:53 {
+    errors
+    health
+    ready
+    cache 30
+    restdyndns (( join(" ", values.apex) )) {
+      zonepath (( values.dataplane.cluster "/" values.dataplane.namespace "/" values.dataplane.zone ))
+      endpoint (( values.runtime.restendpoint ))
+      transitive
+      ttl 30
+    }
+  }

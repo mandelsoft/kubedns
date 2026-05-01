@@ -11,7 +11,7 @@ func (r *ReconcileRequest) DeleteExternalResources() Problem {
 
 	values, _ := r.Values(r.Reconciler.Mode, true)
 	r.Info("rendering manifests to determine objects to be deleted")
-	dataplane, runtime, err := render.Render(r.Reconciler.Manifests, values)
+	rendered, err := render.Render(r.Reconciler.Manifests, values)
 	if err != nil {
 		r.SetStatusCondition(metav1.Condition{
 			Type:    corednsv1alpha1.RuntimeConditionType,
@@ -26,19 +26,19 @@ func (r *ReconcileRequest) DeleteExternalResources() Problem {
 		ReconcileRequest: r,
 		Delete:           true,
 	}
-	dnsdataplane, dnsruntime, prob := r.Reconciler.Options.DNSHandler.Manifests(&dnsctx, values)
+	dnsrendered, prob := r.Reconciler.Options.DNSHandler.Manifests(&dnsctx, values)
 	if prob != nil {
 		return prob
 	}
-	if len(dnsruntime) > 0 {
+	if len(dnsrendered.Runtime) > 0 {
 		r.Info("deleting nameserver dns runtime resources")
-		for _, data := range runtime {
+		for _, data := range dnsrendered.Runtime {
 			prob = AggregateProblem(prob, r.DeleteManifest(data, r.Reconciler.Runtime))
 		}
 	}
-	if len(dnsdataplane) > 0 {
+	if len(dnsrendered.Dataplane) > 0 {
 		r.Info("deleting nameserver dns dataplane resources")
-		for _, data := range dataplane {
+		for _, data := range dnsrendered.Dataplane {
 			prob = AggregateProblem(prob, r.DeleteManifest(data))
 		}
 	}
@@ -48,12 +48,12 @@ func (r *ReconcileRequest) DeleteExternalResources() Problem {
 	}
 
 	r.Info("deleting runtime resources")
-	for _, data := range runtime {
+	for _, data := range rendered.Runtime {
 		prob = AggregateProblem(prob, r.DeleteManifest(data, r.Reconciler.Runtime))
 	}
 
 	r.Info("deleting dataplane resources")
-	for _, data := range dataplane {
+	for _, data := range rendered.Dataplane {
 		prob = AggregateProblem(prob, r.DeleteManifest(data))
 	}
 

@@ -330,7 +330,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 	// even if access for credentials has been failed, the dataplane is applied.
 	// this may create a secret required to get the access token.
 
-	dataplane, runtime, err := render.Render(r.Reconciler.Manifests, values)
+	rendered, err := render.Render(r.Reconciler.Manifests, values)
 	if err != nil {
 		return Failedf("error rendering manifests: %s", err.Error())
 	}
@@ -338,7 +338,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 	r.Info("updating dataplane")
 
 	var modified cluster.ModificationInfo
-	for _, data := range dataplane {
+	for _, data := range rendered.Dataplane {
 		_, err := cluster.ClientSideApply(r.Cluster, r, data, &modified)
 		if err != nil {
 			return TemporaryProblemf("error deploying dataplane: %s", err.Error())
@@ -374,7 +374,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 
 		// apply standard manifests
 		modified.Clear()
-		for _, data := range runtime {
+		for _, data := range rendered.Runtime {
 			o, err := r.ApplyData(octx, data, &modified)
 			if err != nil {
 				if checkNotModifiableError(err) {
@@ -405,22 +405,22 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		// apply additional resources required by DNS provisioning for name servers
 		modified.Clear()
 
-		dnsdataplane, dnsruntime, prob := r.Reconciler.Options.DNSHandler.Manifests(&dnsctx, values)
+		dnsrendered, prob := r.Reconciler.Options.DNSHandler.Manifests(&dnsctx, values)
 		if prob != nil {
 			return prob
 		}
-		if len(dnsdataplane) > 0 {
-			r.Info("found {{amount}} dns dataplane manifests", "amount", len(dnsdataplane))
-			for _, data := range dnsdataplane {
+		if len(dnsrendered.Dataplane) > 0 {
+			r.Info("found {{amount}} dns dataplane manifests", "amount", len(dnsrendered.Dataplane))
+			for _, data := range dnsrendered.Dataplane {
 				_, err := cluster.ClientSideApply(r.Cluster, r, data, &modified)
 				if err != nil {
 					return TemporaryProblemf("error deploying nameserver dns dataplane: %s", err.Error())
 				}
 			}
 		}
-		if len(dnsruntime) > 0 {
-			r.Info("found {{amount}} dns runtime manifests", "amount", len(dnsdataplane))
-			for _, data := range dnsruntime {
+		if len(dnsrendered.Runtime) > 0 {
+			r.Info("found {{amount}} dns runtime manifests", "amount", len(dnsrendered.Runtime))
+			for _, data := range dnsrendered.Runtime {
 				_, err := r.ApplyData(octx, data, &modified)
 				if err != nil {
 					return TemporaryProblemf("error deploying nameserver dns runtime: %s", err.Error())

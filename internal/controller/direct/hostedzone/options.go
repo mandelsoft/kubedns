@@ -23,6 +23,10 @@ type Options struct {
 	DNSMode          string
 	RuntimeNamespace string
 	Platform         string
+	ServerMode       string
+	RestEndpoint     string
+	Kubedyndns       string
+	Restdyndns       string
 
 	DNSHandler DNSHandler
 }
@@ -78,6 +82,12 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&o.DNSClass, "dns-class", "", "dns-system", "DNS class for managed nameserver DNS names")
 	fs.StringVarP(&o.DNSNamespace, "ns-namespace", "", "dns-system", "namespace used to request nameserver DNS names")
 	fs.StringVarP(&o.Platform, "iaas", "", "default", "IaaS layer to use (special support so far for \"aws\"")
+
+	fs.StringVarP(&o.ServerMode, "server-mode", "", SERVERMODE_DATAPLANE, fmt.Sprintf("server mode for deployment (%s or %s)", SERVERMODE_RESTAPI, SERVERMODE_DATAPLANE))
+	fs.StringVarP(&o.RestEndpoint, "rest-endpoint", "", "", "endpoint for REST API")
+	// default images
+	fs.StringVarP(&o.Kubedyndns, "kubednydns", "", "mandelsoft:coredns:latest", "image for dns server using dataplane access")
+	fs.StringVarP(&o.Restdyndns, "restdnydns", "", "mandelsoft:restdnyndns-coredns:latest", "image for dns server using REST API access")
 }
 
 func (o *Options) Configure(ctx context.Context, cfg *manager.Options, opts flagutils.OptionSet) error {

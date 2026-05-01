@@ -1,0 +1,11 @@
+#!/bin/bash
+
+T=root:provider
+F=kcp.kubeconfig
+if [ -n "$1" ]; then
+  T="$1"
+fi
+k ws $T
+yq eval '.clusters += (.clusters[] | select(.name == "workspace.kcp.io/current") | .name = "'$T'")' "$F" -i
+yq eval '.contexts += [{"name": "'$T'", "context": {"cluster": "'$T'", "user": "kcp-admin", "namespace": "default"}}]' "$F" -i
+

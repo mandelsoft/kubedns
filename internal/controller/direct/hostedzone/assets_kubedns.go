@@ -3,34 +3,19 @@ package hostedzone
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"strings"
 
+	"github.com/mandelsoft/goutils/funcs"
+	"github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/pkg/render"
 	"github.com/mandelsoft/logging"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const kubeDNSDir = "assets/dns/kubedns"
 
 func GetKubeDNSManifests() (map[string][]byte, error) {
-	manifests := make(map[string][]byte)
-	entries, err := fs.ReadDir(content, kubeDNSDir)
-	if err != nil {
-		return nil, err
-	}
-	for _, e := range entries {
-		if !e.IsDir() {
-			if strings.HasSuffix(e.Name(), ".yaml") || strings.HasSuffix(e.Name(), ".yml") {
-				data, err := content.ReadFile(kubeDNSDir + "/" + e.Name())
-				if err != nil {
-					return nil, err
-				}
-				manifests[e.Name()] = data
-			}
-		}
-	}
-	return manifests, nil
+	return GetManifestsFromDir(kubeDNSDir)
 }
 
 func addDNSValues(values map[string]interface{}) {
@@ -55,55 +40,82 @@ func TestRenderKubeDNSManifests(logger logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	ctx := NewReconcileContext(context.Background(), logger, "http://api.server", "testcluster", "aws", client.ObjectKey{Name: "myzone", Namespace: "default"})
+	obj := &v1alpha1.HostedZone{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.HostedZoneSpec{
+			DomainNames: []string{
+				"test.mandelsoft.org",
+				"test.mandelsoft.de",
+			},
+		},
+	}
+	ctx := NewReconcileContext(context.Background(), logger, "http://api.server", "testcluster", "aws", obj)
 	ctx.Simulate = true
 
 	r := &HostedZoneReconciler{
 		Options: NewOptions(),
 	}
-	values, err := ctx.Values(NewLocalMode(r), false)
+	r.ServerMode = funcs.Must(NewDataplaneServer(nil, r.Options))
+	r.Mode = NewLocalMode(r)
+	values, err := ctx.Values(r.Mode, false)
 	if err != nil {
 		return fmt.Errorf("get local mode values: %w", err)
 	}
 	addDNSValues(values)
-	_, _, err = render.Render(manifests, values)
+	rendered, err := render.Render(manifests, values)
 	if err != nil {
 		return fmt.Errorf("local mode rendering: %w", err)
 	}
+	if len(rendered.Other) > 0 {
+		return fmt.Errorf("local mode rendering: provided non-manifest")
+	}
 
 	r.Options.RuntimeNamespace = ""
-	values, err = ctx.Values(NewRuntimeMode(r), false)
+	r.ServerMode = funcs.Must(NewDataplaneServer(nil, r.Options))
+	r.Mode = NewRuntimeMode(r)
+	values, err = ctx.Values(r.Mode, false)
 	if err != nil {
 		return fmt.Errorf("get runtime mode values: %w", err)
 	}
 	addDNSValues(values)
-	dataplane, runtime, err := render.Render(manifests, values)
+	rendered, err = render.Render(manifests, values)
 	if err != nil {
 		return fmt.Errorf("runtime mode rendering: %w", err)
 	}
+	if len(rendered.Other) > 0 {
+		return fmt.Errorf("runtime mode rendering: provided non-manifest")
+	}
 
 	r.Options.RuntimeNamespace = "dns-runtime"
-	values, err = ctx.Values(NewRuntimeMode(r), false)
+	r.ServerMode = funcs.Must(NewDataplaneServer(nil, r.Options))
+	r.Mode = NewRuntimeMode(r)
+	values, err = ctx.Values(r.Mode, false)
 	if err != nil {
 		return fmt.Errorf("get central runtime mode values: %w", err)
 	}
 	addDNSValues(values)
 
-	dataplane, runtime, err = render.Render(manifests, values)
+	rendered, err = render.Render(manifests, values)
 	if err != nil {
 		return fmt.Errorf("central runtime mode rendering: %w", err)
 	}
+	if len(rendered.Other) > 0 {
+		return fmt.Errorf("runtime mode rendering: provided non-manifest")
+	}
 
-	if len(dataplane) > 0 {
+	if len(rendered.Dataplane) > 0 {
 		fmt.Printf("dns dataplane manifests:\n")
-		for k, v := range dataplane {
+		for k, v := range rendered.Dataplane {
 			fmt.Printf("- %s:\n", k)
 			fmt.Printf("    %s\n", strings.Replace(string(v), "\n", "\n    ", -1))
 		}
 	}
-	if len(runtime) > 0 {
+	if len(rendered.Runtime) > 0 {
 		fmt.Printf("dns runtime manifests:\n")
-		for k, v := range runtime {
+		for k, v := range rendered.Runtime {
 			fmt.Printf("- %s:\n", k)
 			fmt.Printf("    %s\n", strings.Replace(string(v), "\n", "\n    ", -1))
 		}

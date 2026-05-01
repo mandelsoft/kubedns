@@ -1,0 +1,45 @@
+apiVersion: apis.kcp.io/v1alpha2
+kind: APIBinding
+metadata:
+  name: coredns.mandelsoft.org
+spec:
+  reference:
+    export:
+      name: coredns.mandelsoft.org
+      path: "root:provider"
+  permissionClaims:
+    - group: ""
+      resource: events
+      verbs: [ "create", "patch" ]
+      state: Accepted
+      selector:
+          matchAll: true
+    - group: ""
+      resource: serviceaccounts
+      verbs: [ "*" ]
+      state: Accepted
+      selector:
+        matchLabels:
+          provider: dns
+    - group: ""
+      resource: secrets
+      verbs: [ "*" ]
+      state: Accepted
+      selector:
+        matchLabels:
+          provider: dns
+    - group: "rbac.authorization.k8s.io"
+      resource: roles
+      verbs: [ "*" ]
+      state: Accepted
+      selector:
+        matchLabels:
+          provider: dns
+    - group: "rbac.authorization.k8s.io"
+      resource: rolebindings
+      verbs: [ "*" ]
+      state: Accepted
+      selector:
+        matchLabels:
+          provider: dns
+    

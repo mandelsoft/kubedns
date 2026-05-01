@@ -37,7 +37,7 @@ func NewDNSByKubedns(ctx context.Context, opts *Options) (DNSHandler, error) {
 	return &dnsKubedns{domain: opts.DNSDomain, class: opts.DNSClass, namespace: opts.DNSNamespace}, nil
 }
 
-func (d *dnsKubedns) Manifests(ctx *DNSContext, values map[string]interface{}) (map[string][]byte, map[string][]byte, reconcile.Problem) {
+func (d *dnsKubedns) Manifests(ctx *DNSContext, values map[string]interface{}) (*render.Rendered, reconcile.Problem) {
 	var ips []net.IP
 	var cnames []string
 
@@ -45,21 +45,21 @@ func (d *dnsKubedns) Manifests(ctx *DNSContext, values map[string]interface{}) (
 		ips, cnames = isLoadBalancerReady(ctx.Service)
 		if len(cnames) == 0 && len(ips) == 0 {
 			// service change trigger reconciliation -> no backoff
-			return nil, nil, reconcile.WatchBackedProblemf("load balancer not yet available")
+			return nil, reconcile.WatchBackedProblemf("load balancer not yet available")
 		}
 	}
 
 	dnsnames, err := d.getCNames(ctx)
 	if err != nil {
 		if !ctx.Delete {
-			return nil, nil, reconcile.Requeuef("dnsnames not yet available")
+			return nil, reconcile.Requeuef("dnsnames not yet available")
 		}
 	}
 
 	manifests, err := GetKubeDNSManifests()
 	if err != nil {
 		if !ctx.Delete {
-			return nil, nil, reconcile.Failedf("cannot get dns manifests: %s", err.Error())
+			return nil, reconcile.Failedf("cannot get dns manifests: %s", err.Error())
 		}
 	}
 
@@ -79,12 +79,12 @@ func (d *dnsKubedns) Manifests(ctx *DNSContext, values map[string]interface{}) (
 		dns["cname"] = cnames[0]
 	}
 	values["dns"] = dns
-	dataplane, runtime, err := render.Render(manifests, values)
+	rendered, err := render.Render(manifests, values)
 	if err != nil {
-		return nil, nil, reconcile.Failedf("cannot get dns manifests: %s", err.Error())
+		return nil, reconcile.Failedf("cannot get dns manifests: %s", err.Error())
 	}
 
-	return dataplane, runtime, nil
+	return rendered, nil
 }
 
 func (d *dnsKubedns) Modify(ctx *DNSContext, obj client.Object) error {

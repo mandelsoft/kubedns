@@ -39,12 +39,12 @@ spec:
       labels:
         app: (( values.runtime.label ))
     spec:
-      automountServiceAccountToken: (( values.runtime.secret.name == "" ))
-      serviceAccountName: (( optional( values.runtime.secret.name == "", values.dataplane.access.serviceaccount) ))
+      automountServiceAccountToken: (( values.dataplane.access.serviceaccount != "" || false ))
+      serviceAccountName: (( values.dataplane.access.serviceaccount || ~~ ))
       containers:
         - name: dns-container
           # Use your actual image here. Using coredns/coredns as an example.
-          image: mandelsoft/coredns:latest
+          image: (( values.runtime.image ))
           imagePullPolicy: Always
 
           # Pass the config file path via the --corefile option

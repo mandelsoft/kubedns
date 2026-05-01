@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/mandelsoft/goutils/sliceutils"
 	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -21,6 +23,7 @@ type ReconcileContext interface {
 	IsSimulate() bool
 	GetPlatform() string
 	GetKey() client.ObjectKey
+	GetObject() *v1alpha1.HostedZone
 
 	Values(m Mode, deleting bool) (map[string]interface{}, error)
 }
@@ -36,10 +39,12 @@ type reconcileContext struct {
 	clusterId string
 
 	Simulate bool
+
+	Object *v1alpha1.HostedZone
 }
 
-func NewReconcileContext(ctx context.Context, log logging.Logger, server string, clusterId string, platform string, key client.ObjectKey) reconcileContext {
-	return reconcileContext{Logger: log, Context: ctx, apiServer: server, clusterId: clusterId, ObjectKey: key, Platform: platform}
+func NewReconcileContext(ctx context.Context, log logging.Logger, server string, clusterId string, platform string, obj *v1alpha1.HostedZone) reconcileContext {
+	return reconcileContext{Logger: log, Context: ctx, apiServer: server, clusterId: clusterId, Object: obj, Platform: platform, ObjectKey: client.ObjectKeyFromObject(obj)}
 }
 
 func (c reconcileContext) GetId() string {
@@ -47,6 +52,10 @@ func (c reconcileContext) GetId() string {
 		return c.clusterId
 	}
 	return c.Cluster.GetId()
+}
+
+func (c reconcileContext) GetObject() *v1alpha1.HostedZone {
+	return c.Object
 }
 
 func (c reconcileContext) IsSimulate() bool {
@@ -87,6 +96,7 @@ func Values(c ReconcileContext, m Mode, deleting bool) (map[string]interface{}, 
 		return nil, err
 	}
 	values := map[string]interface{}{
+		"apex": sliceutils.Convert[any](c.GetObject().Spec.DomainNames),
 		"dataplane": map[string]interface{}{
 			"namespace": key.Namespace,
 			"server":    u.String(),
@@ -94,6 +104,7 @@ func Values(c ReconcileContext, m Mode, deleting bool) (map[string]interface{}, 
 			"label":     accname,
 			"access":    access,
 			"zone":      key.Name,
+			"cluster":   c.GetId(),
 		},
 		"runtime": map[string]interface{}{
 			"platform":  c.GetPlatform(),
@@ -108,6 +119,10 @@ func Values(c ReconcileContext, m Mode, deleting bool) (map[string]interface{}, 
 	}
 	tmp, repeat := m.AccessValues(c, accname, deleting)
 	mergeValues(access, tmp)
+	err = m.ServerMode().AddValues(values)
+	if err != nil {
+		panic(fmt.Errorf("cannot render server mode values: %w", err))
+	}
 	data, _ := json.Marshal(values)
 	c.Info("values {{values}}", "values", string(data))
 	return values, repeat

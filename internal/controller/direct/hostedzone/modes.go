@@ -6,8 +6,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type ModeFactory = func(r *HostedZoneReconciler) Mode
+
 type Mode interface {
 	Validate() error
+
+	ServerMode() ServerMode
 
 	RuntimeNamespace(c cluster.Cluster, key client.ObjectKey) string
 	RuntimeSecretName(c cluster.Cluster, key client.ObjectKey) string
@@ -29,10 +33,14 @@ func (m *ModeImpl) Validate() error {
 	return nil
 }
 
+func (m *ModeImpl) ServerMode() ServerMode {
+	return m.HostedZoneReconciler.ServerMode
+}
+
 func (m *ModeImpl) Cleanup(ctx ReconcileContext, name string) reconcile.Problem {
 	secretkey := client.ObjectKey{Namespace: ctx.GetKey().Namespace, Name: name}
 	if !ctx.IsSimulate() {
-		m.index.Remove(INDEX_SASECFRET, ctx.GetKey(), secretkey)
+		m.index.Remove(INDEX_SASECRET, ctx.GetKey(), secretkey)
 	}
 	return nil
 }

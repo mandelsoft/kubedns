@@ -1,0 +1,91 @@
+#!/bin/bash -e
+
+SA=apiexport-serviceaccount-coredns
+SN=kcp-controller-token
+NS=dns-service
+KC=gen/controller.kubeconfig
+
+SRV="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
+echo "server is $SRV"
+
+if ! kubectl -n "$NS" get serviceaccount "$SA" >/dev/null 2>&1; then
+  echo creating serviceaccount  $NS/$SA
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: $SA
+  namespace: $NS
+else
+  echo found serviceaccount $NS/$SA
+fi
+
+if ! kubectl -n "$NS" get secret "$SN" >/dev/null 2>&1; then
+  echo creating secret $NS/$SN for serviceaccout $A
+  kubectl apply -f -  <<EOF
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: $SN
+  namespace: $NS
+  annotations:
+    kubernetes.io/service-account.name: $SA
+EOF
+else
+  echo found secret $NS/$SN
+fi
+
+echo getting token and cert from $NS/$SN
+while true; do
+  token="$(kubectl get -n "$NS" secret "$SN" -o jsonpath='{.data.token}' | base64 --decode)"
+  cert="$(kubectl get -n "$NS" secret "$SN" -o jsonpath='{.data.ca\.crt}')"
+
+  if [ -n "$token" ]; then
+    break
+  else
+    echo "token not yet available ... waiting"
+    sleep 2
+  fi
+done
+
+
+cat <<EOF > "$KC"
+apiVersion: v1
+kind: Config
+clusters:
+- name: $(basename "$KC")
+  cluster:
+    certificate-authority-data: ${cert}
+    server: ${SRV}
+contexts:
+- name: sa-context
+  context:
+    cluster: $(basename "$KC")
+    user: $A
+    namespace: $NS
+current-context: sa-context
+users:
+- name: $A
+  user:
+    token: ${token}
+EOF
+  echo "Generated $KC"
+
+if [ -n "$RT" ]; then
+  SECRET="$(cat <<EOF
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: $SN
+  namespace: $NS
+data:
+  kubeconfig: $(base64 -w 0 "$A.kubeconfig")
+  token: $(base64 -w 0 <<<"$token")
+  ca.crt: $cert
+EOF
+)"
+  echo "$SECRET"
+  kubectl --kubeconfig "$RT" apply -f - <<<"$SECRET"
+fi
+

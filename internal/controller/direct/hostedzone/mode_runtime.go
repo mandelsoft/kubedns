@@ -30,10 +30,13 @@ func (m *RuntimeMode) RuntimeNamespace(c cluster.Cluster, key client.ObjectKey) 
 }
 
 func (m *RuntimeMode) RuntimeSecretName(c cluster.Cluster, key client.ObjectKey) string {
-	if m.Options.RuntimeNamespace != "" {
-		return objutils.GenerateUniqueName(BASE, c.GetId(), "", key.Namespace, objutils.MAX_NAMESPACELEN)
+	if m.ServerMode().RequireDataplaneAccess() {
+		if m.Options.RuntimeNamespace != "" {
+			return objutils.GenerateUniqueName(BASE, c.GetId(), "", key.Namespace, objutils.MAX_NAMESPACELEN)
+		}
+		return fmt.Sprintf("%s", BASE)
 	}
-	return fmt.Sprintf("%s", BASE)
+	return ""
 }
 
 func (m *RuntimeMode) RuntimeDeploymentName(c cluster.Cluster, key client.ObjectKey) string {
@@ -52,9 +55,12 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting b
 			"ca.crt": []byte(base64.StdEncoding.EncodeToString([]byte("server-ca-cert"))),
 		}
 	} else {
+		if !m.ServerMode().RequireDataplaneAccess() {
+			return nil, nil
+		}
 		key := client.ObjectKey{Namespace: ctx.GetKey().Namespace, Name: name}
 		if !ctx.IsSimulate() {
-			m.index.Add(INDEX_SASECFRET, ctx.GetKey(), key)
+			m.index.Add(INDEX_SASECRET, ctx.GetKey(), key)
 		}
 		err := ctx.Get(ctx, key, &secret)
 		if err != nil {
@@ -99,6 +105,7 @@ func (m *RuntimeMode) AccessValues(ctx ReconcileContext, name string, deleting b
 	if cert != nil {
 		access["cadata"] = string(cert)
 	}
+	access["automountServiceAccountToken"] = false
 	return access, nil
 }
 
@@ -123,31 +130,33 @@ func (m *RuntimeMode) Cleanup(ctx ReconcileContext, name string) Problem {
 	}
 
 	key := client.ObjectKey{Namespace: ctx.GetKey().Namespace, Name: name}
-	found := len(m.index.UsersFor(INDEX_SASECFRET, key))
+	found := len(m.index.UsersFor(INDEX_SASECRET, key))
 	if found != 0 {
 		m.Info("found still {{amount}} zones", "amount", found)
 		return nil
 	}
 
-	var secret v1.Secret
-	if err := ctx.Get(ctx, key, &secret); err != nil {
-		if !errors.IsNotFound(err) {
-			return TemporaryProblem(err)
-		}
-		ctx.Info("serviceaccount secret {{secret}} already gone", "secret", key)
-	} else {
-		if secret.GetDeletionTimestamp().IsZero() {
-			ctx.Info("request deletion of serviceaccount secret {{secret}}", "secret", key)
-			err = ctx.Delete(ctx, &secret)
-			if err != nil {
-				if !errors.IsNotFound(err) {
-					return TemporaryProblem(err)
-				}
-				ctx.Info(" serviceaccount secret {{secret}} already gone", "secret", key)
+	if m.ServerMode().RequireDataplaneAccess() {
+		var secret v1.Secret
+		if err := ctx.Get(ctx, key, &secret); err != nil {
+			if !errors.IsNotFound(err) {
+				return TemporaryProblem(err)
 			}
+			ctx.Info("serviceaccount secret {{secret}} already gone", "secret", key)
 		} else {
-			ctx.Info(" serviceaccount secret {{secret}} is waiting for finalizers {{finalizers}}", "secret", key, "finalizers", secret.Finalizers)
-			return Requeuef("waiting for secret finalizers to be removed")
+			if secret.GetDeletionTimestamp().IsZero() {
+				ctx.Info("request deletion of serviceaccount secret {{secret}}", "secret", key)
+				err = ctx.Delete(ctx, &secret)
+				if err != nil {
+					if !errors.IsNotFound(err) {
+						return TemporaryProblem(err)
+					}
+					ctx.Info(" serviceaccount secret {{secret}} already gone", "secret", key)
+				}
+			} else {
+				ctx.Info(" serviceaccount secret {{secret}} is waiting for finalizers {{finalizers}}", "secret", key, "finalizers", secret.Finalizers)
+				return Requeuef("waiting for secret finalizers to be removed")
+			}
 		}
 	}
 
