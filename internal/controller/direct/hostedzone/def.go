@@ -36,7 +36,7 @@ import (
 const INDEX_SASECRET = "serviceaccount-secret"
 
 func Controller() controller.Definition {
-	return controller.Define[*corednsv1alpha1.HostedZone](direct.ControllerHostedzone, "dataplane", &ReconcilerFactory{}).
+	return controller.Define[*corednsv1alpha1.HostedZone](direct.ControllerHostedzone, "dataplane", NewReconcilerFactory()).
 		UseCluster("runtime").
 		InGroup(direct.GROUP).
 		AddIndex(direct.IndexKeyZoneParent, direct.ParentIndexer).

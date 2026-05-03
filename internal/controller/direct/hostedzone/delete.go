@@ -26,7 +26,7 @@ func (r *ReconcileRequest) DeleteExternalResources() Problem {
 		ReconcileRequest: r,
 		Delete:           true,
 	}
-	dnsrendered, prob := r.Reconciler.Options.DNSHandler.Manifests(&dnsctx, values)
+	dnsrendered, prob := r.Reconciler.Options.DNSMode.Manifests(&dnsctx, values)
 	if prob != nil {
 		return prob
 	}

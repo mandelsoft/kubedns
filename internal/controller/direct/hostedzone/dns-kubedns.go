@@ -6,35 +6,68 @@ import (
 	"maps"
 	"net"
 
+	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/sliceutils"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/pkg/render"
+	"github.com/spf13/pflag"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const DNSMODE_KUBEDNS = "kubedns"
+
 func init() {
-	DNSModes.Register("kubedns", DNSModeFactory(NewDNSByKubedns))
+	DNSModes.Register(DNSMODE_KUBEDNS, NewKubednsDNSModeFactory())
 }
 
-type dnsKubedns struct {
-	domain    string
-	class     string
+var _ flagutils.Options = (*kubednsDNSModeFactory)(nil)
+
+type kubednsDNSModeFactory struct {
+	flagutils.DefaultOptionSet
+	class     *flagutils.OptionsRef[*DNSClassOption]
+	domain    *flagutils.OptionsRef[*DNSDomainOption]
 	namespace string
 }
 
-func NewDNSByKubedns(ctx context.Context, opts *Options) (DNSHandler, error) {
+func NewKubednsDNSModeFactory() DNSModeFactory {
+	f := &kubednsDNSModeFactory{
+		class:  flagutils.NewDefaultOptionsRef[*DNSClassOption](),
+		domain: flagutils.NewDefaultOptionsRef[*DNSDomainOption](),
+	}
+	f.DefaultOptionSet.Add(f.class, f.domain)
+	return f
+}
 
-	if opts.DNSDomain == "" {
+func (s *kubednsDNSModeFactory) AddFlags(fs *pflag.FlagSet) {
+	s.DefaultOptionSet.AddFlags(fs)
+	fs.StringVar(&s.namespace, "dns-namespace", s.namespace, "namespace used to request nameserver DNS names")
+}
+
+func (s *kubednsDNSModeFactory) Description() string {
+	return "DNS record provisioning by kubedns"
+}
+
+func (s *kubednsDNSModeFactory) Create(ctx context.Context, cfg *Options) (DNSMode, error) {
+	if s.domain.Options.domain == "" {
 		return nil, fmt.Errorf("DNS domain required")
 	}
-	if opts.DNSClass == "" {
+	if s.class.Options.class == "" {
 		return nil, fmt.Errorf("DNS class required")
 	}
-	if opts.DNSNamespace == "" {
+	if s.namespace == "" {
 		return nil, fmt.Errorf("DNS namespace required")
 	}
-	return &dnsKubedns{domain: opts.DNSDomain, class: opts.DNSClass, namespace: opts.DNSNamespace}, nil
+	return &dnsKubedns{DNSDummy: DNSDummy{DNSMODE_KUBEDNS}, domain: s.domain.Options.domain, class: s.domain.Options.domain, namespace: s.namespace}, nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+type dnsKubedns struct {
+	DNSDummy
+	domain    string
+	class     string
+	namespace string
 }
 
 func (d *dnsKubedns) Manifests(ctx *DNSContext, values map[string]interface{}) (*render.Rendered, reconcile.Problem) {

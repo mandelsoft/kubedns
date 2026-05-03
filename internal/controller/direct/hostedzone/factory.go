@@ -18,6 +18,10 @@ type ReconcilerFactory struct {
 	Options
 }
 
+func NewReconcilerFactory() *ReconcilerFactory {
+	return &ReconcilerFactory{*NewOptions()}
+}
+
 func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller controller.TypedController[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone], b builder.Builder) (crtreconcile.Reconciler, error) {
 	logger := controller.GetLogger()
 	logger.Info("creating hostedzone reconciler...")
@@ -58,7 +62,8 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 	r.Info("for Platform mode '{{platform}}'", "platform", r.Options.Platform)
 	r.Info("using FieldManger '{{fieldmanager}}'", "fieldmanager", r.FieldManager)
 	r.Info("using Finalizer '{{finalizer}}'", "finalizer", r.Finalizer)
-	r.Info("using Nameserver mode '{{mode}}'", "mode", r.Options.DNSMode)
+	r.Info("using DNS mode '{{mode}}'", "mode", r.Options.DNSMode.GetName())
+	r.Info("using Nameserver mode '{{mode}}'", "mode", r.Options.ServerMode.GetName())
 
 	m, err := GetManifests()
 	if err != nil {
@@ -84,7 +89,7 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 		return nil, err
 	}
 
-	r.ServerMode, err = NewDataplaneServer(ctx, r.Options)
+	r.ServerMode, err = ServerModes.Create(nil, SERVERMODE_DATAPLANE, r.Options)
 	if err != nil {
 		return nil, err
 	}

@@ -368,7 +368,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 			owner.AddOwnerModifier(r, r.Object, r.Reconciler.ownerFilter, r.GetController().GetOwnerHandler()),
 			// adapt to provide DNS records for nameservers
 			cluster.ObjectModifierFunc(func(_ cluster.Cluster, obj client.Object) error {
-				return r.Reconciler.Options.DNSHandler.Modify(&dnsctx, obj)
+				return r.Reconciler.Options.DNSMode.Modify(&dnsctx, obj)
 			}),
 		)
 
@@ -405,7 +405,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 		// apply additional resources required by DNS provisioning for name servers
 		modified.Clear()
 
-		dnsrendered, prob := r.Reconciler.Options.DNSHandler.Manifests(&dnsctx, values)
+		dnsrendered, prob := r.Reconciler.Options.DNSMode.Manifests(&dnsctx, values)
 		if prob != nil {
 			return prob
 		}
@@ -468,7 +468,7 @@ func (r *ReconcileRequest) HandleExternalResources() Problem {
 
 		var cnames []string
 		if dnsctx.Service != nil {
-			cnames, prob = r.Reconciler.Options.DNSHandler.GetCNames(&dnsctx)
+			cnames, prob = r.Reconciler.Options.DNSMode.GetCNames(&dnsctx)
 			sum = AggregateProblem(sum, prob)
 			r.Info("cnames state", "service", svcName, "cnames", cnames, "error", err)
 			reason := corednsv1alpha1.ReasonNameserverPending

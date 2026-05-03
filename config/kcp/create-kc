@@ -1,15 +1,114 @@
 #!/bin/bash -e
 
+# set KUBECONFIG to your datapalane cluster
+# or provider workspace  for KCP.
+# It creates a kubeconfig in $KC for
+# a controller working on resources in this
+# environment.
+
 SA=apiexport-serviceaccount-coredns
 SN=kcp-controller-token
 NS=dns-service
 KC=gen/controller.kubeconfig
+RT=
+TS=
+TN=dns-system
+
+error()
+{
+  echo "error: $*" >&2
+  exit 1
+}
+
+args=( "$@" )
+consume()
+{
+  local n=$1
+  if [ $# -eq 0 ]; then
+    n=1
+  fi
+  args=( "${args[@]:$n}")
+}
+
+getArg()
+{
+  if [ ${#args[@]} -lt 2 ]; then
+            error "$1 requires an argument"
+  fi
+  local -n target=$1
+  target="${args[1]}"
+  consume 2
+}
+
+help()
+{
+  echo "create a kubeconfig for a controller using a adataplane to access"
+  echo "the DNS resources"
+  echo "--dp <kubeconfig>:        dataplane/provider workspace kubeconfig"
+  echo "--sa <serviceaccount>:    service account for created kubeconfig"
+  echo "--sn <secret name>:       service account secret in dataplane and target secret"
+  echo "--ns <namespace>:         namespace in dataplane and target secret"
+  echo "--kc <target>:            file name for target kubeconfig"
+  echo "--rt <kubeconfig>:        target kubeconfig used to create target secret (if set)"
+  echo "--ts <secret name>:       target secret name (defaults to sn)"
+  echo "--tn <target namespace>:  target namespace(defaults to ns)"
+  exit 0
+}
+
+while [ ${#args[@]} -gt 0 ]; do
+  case "${args[0]}" in
+     --dry-run)
+       D=X
+       consume;;
+     --restserver)
+         TS=controller-manager-restdataplane
+         consume;;
+     --kubedns)
+         TS=controller-manager-dataplane
+         consume;;
+     --dp) getArg KUBECONFIG
+           export KUBECONFIG;;
+     --sa) getArg SA;;
+     --sn) getArg SN;;
+     --ns) getArg NS;;
+     --kc) getArg KC;;
+     --rt) getArg RT
+           KC=;;
+     --ts) getArg TS;;
+     --tn) getArg TN;;
+     --help|-h) help;;
+     --*|-*) error "invalid argument ${args[0]}"
+  esac
+done
+
+echo "kubeconfig:         $KUBECONFIG"
+echo "service account:    $SA"
+echo "secret name:        $SN"
+echo "namespace:          $NS"
+echo "target file:        $KC"
+if [ -n "$RT" ]; then
+  if [ -z "$TS" ]; then
+    TS="$SN"
+  fi
+  if [ -z "$TN" ]; then
+      TN="$NS"
+    fi
+  echo "runtime kubeconfig: $RT"
+  echo "runtime secret:     $TS"
+  echo "runtime namespace:  $TN"
+fi
+
+if [ -n "$D" ]; then
+  exit 1
+fi
+
 
 SRV="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
 echo "server is $SRV"
 
 if ! kubectl -n "$NS" get serviceaccount "$SA" >/dev/null 2>&1; then
   echo creating serviceaccount  $NS/$SA
+  kubectl apply -f -  <<EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -48,19 +147,23 @@ while true; do
   fi
 done
 
+C="$(basename "$KC")"
+if [ -z "$C" ]; then
+  C=dataplane
+fi
 
-cat <<EOF > "$KC"
+CONFIG="$(cat <<EOF
 apiVersion: v1
 kind: Config
 clusters:
-- name: $(basename "$KC")
+- name: $C
   cluster:
     certificate-authority-data: ${cert}
     server: ${SRV}
 contexts:
 - name: sa-context
   context:
-    cluster: $(basename "$KC")
+    cluster: $C
     user: $A
     namespace: $NS
 current-context: sa-context
@@ -69,23 +172,29 @@ users:
   user:
     token: ${token}
 EOF
+)"
+if [ -n "$KC" ]; then
+  echo "$CONFIG" > "$KC"
   echo "Generated $KC"
+fi
 
 if [ -n "$RT" ]; then
+  echo creating secret in target $TN
   SECRET="$(cat <<EOF
 apiVersion: v1
 kind: Secret
 type: Opaque
 metadata:
-  name: $SN
-  namespace: $NS
+  name: $TS
+  namespace: $TN
 data:
-  kubeconfig: $(base64 -w 0 "$A.kubeconfig")
+  kubeconfig: $(base64 -w 0 <<<"$CONFIG")
   token: $(base64 -w 0 <<<"$token")
   ca.crt: $cert
 EOF
 )"
   echo "$SECRET"
   kubectl --kubeconfig "$RT" apply -f - <<<"$SECRET"
+  echo "Created kubeconfig secret $SN"
 fi
 

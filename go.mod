@@ -8,9 +8,9 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/kcp-dev/sdk v0.30.0
 	github.com/lestrrat-go/jwx/v2 v2.1.6
-	github.com/mandelsoft/flagutils v0.0.0-20260411162530-8fa8704c866e
+	github.com/mandelsoft/flagutils v0.0.0-20260501194609-8a50fcdc8aa7
 	github.com/mandelsoft/goutils v0.0.0-20260419151859-e28bee9b7032
-	github.com/mandelsoft/kubecrtutils v0.0.0-20260325101220-db841a30ce37
+	github.com/mandelsoft/kubecrtutils v0.0.0-20260503123820-cca22d376086
 	github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4
 	github.com/mandelsoft/spiff v1.3.0-beta-7.0.20251217160149-636218617943
 	github.com/miekg/dns v1.1.72
@@ -22,6 +22,7 @@ require (
 	k8s.io/client-go v0.35.0
 	sigs.k8s.io/controller-runtime v0.23.1
 	sigs.k8s.io/multicluster-runtime v0.23.1
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -61,7 +62,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kcp-dev/apimachinery/v2 v2.30.0 // indirect
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5 // indirect
-	github.com/kcp-dev/multicluster-provider v0.5.0 // indirect
+	github.com/kcp-dev/multicluster-provider v0.6.0 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.3 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
@@ -128,9 +129,9 @@ require (
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
-	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace github.com/mandelsoft/kubecrtutils => ../kubecrtutils
+//replace github.com/mandelsoft/kubecrtutils => ../kubecrtutils
 
-replace github.com/kcp-dev/multicluster-provider => ../../../github.com/kcp-dev/multicluster-provider
+//replace github.com/kcp-dev/multicluster-provider => ../../../github.com/kcp-dev/multicluster-provider
+replace github.com/kcp-dev/multicluster-provider => github.com/mandelsoft/multicluster-provider v0.0.0-20260304155307-cdb2c159df23

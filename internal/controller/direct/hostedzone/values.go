@@ -119,7 +119,7 @@ func Values(c ReconcileContext, m Mode, deleting bool) (map[string]interface{}, 
 	}
 	tmp, repeat := m.AccessValues(c, accname, deleting)
 	mergeValues(access, tmp)
-	err = m.ServerMode().AddValues(values)
+	err = m.ServerMode().ExtendValues(values)
 	if err != nil {
 		panic(fmt.Errorf("cannot render server mode values: %w", err))
 	}

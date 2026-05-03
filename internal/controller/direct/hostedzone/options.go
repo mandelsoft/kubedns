@@ -2,12 +2,12 @@ package hostedzone
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/goutils/errors"
 	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils"
 	"github.com/mandelsoft/kubecrtutils/options/manageropts"
 	"github.com/mandelsoft/kubedns/internal/controller/common"
 	"github.com/spf13/pflag"
@@ -17,18 +17,14 @@ import (
 type Options struct {
 	Runtime          *string
 	Class            *string
-	DNSClass         string
-	DNSDomain        string
-	DNSNamespace     string
-	DNSMode          string
 	RuntimeNamespace string
 	Platform         string
-	ServerMode       string
-	RestEndpoint     string
-	Kubedyndns       string
-	Restdyndns       string
 
-	DNSHandler DNSHandler
+	_DNSModes    controllerutils.Registry[*Options, DNSMode]
+	_ServerModes controllerutils.Registry[*Options, ServerMode]
+
+	DNSMode    DNSMode
+	ServerMode ServerMode
 }
 
 func From(opts flagutils.OptionSetProvider) *Options {
@@ -42,16 +38,28 @@ var (
 )
 
 func NewOptions() *Options {
-	return &Options{}
+	return &Options{
+		_DNSModes:    DNSModes.Clone(),
+		_ServerModes: ServerModes.Clone(),
+	}
 }
 
-func (*Options) Prepare(ctx context.Context, opts flagutils.OptionSet, v flagutils.PreparationSet) error {
-	return common.Assure(opts)
+func (o *Options) Prepare(ctx context.Context, opts flagutils.OptionSet, v flagutils.PreparationSet) error {
+	return errors.Join(
+		v.PrepareSet(ctx, opts, o._DNSModes),
+		v.PrepareSet(ctx, opts, o._ServerModes),
+		common.Assure(opts),
+	)
 }
 
 func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
-	var err error
-
+	err := errors.Join(
+		v.ValidateSet(ctx, opts, o._DNSModes),
+		v.ValidateSet(ctx, opts, o._ServerModes),
+	)
+	if err != nil {
+		return err
+	}
 	copt := common.From(opts)
 	if copt == nil {
 		return fmt.Errorf("class option not found in option definitions")
@@ -69,25 +77,19 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 		return fmt.Errorf("dataplane cluster is required")
 	}
 
-	o.DNSHandler, err = DNSModes.Create(ctx, o.DNSMode, o)
-	return errors.Wrapf(err, "dns mode %q", o.DNSMode)
+	o.DNSMode, err = o._DNSModes.CreateConfigured(ctx, o)
+	if err != nil {
+		return err
+	}
+	o.ServerMode, err = o._ServerModes.CreateConfigured(ctx, o)
+	return err
 }
 
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
-	modes := DNSModes.Names()
+	o._ServerModes.AddFlags(fs)
+	o._DNSModes.AddFlags(fs)
 	fs.StringVarP(&o.RuntimeNamespace, "runtime-namespace", "", "", "use single runtime namespace for deployments")
-
-	fs.StringVarP(&o.DNSMode, "dns-mode", "", "loadbalancer", fmt.Sprintf("DNS mode for providing nameserver cnames [%s]", strings.Join(modes, ",")))
-	fs.StringVarP(&o.DNSDomain, "dns-domain", "", "", "DNS domain for managed nameserver DNS names")
-	fs.StringVarP(&o.DNSClass, "dns-class", "", "dns-system", "DNS class for managed nameserver DNS names")
-	fs.StringVarP(&o.DNSNamespace, "ns-namespace", "", "dns-system", "namespace used to request nameserver DNS names")
 	fs.StringVarP(&o.Platform, "iaas", "", "default", "IaaS layer to use (special support so far for \"aws\"")
-
-	fs.StringVarP(&o.ServerMode, "server-mode", "", SERVERMODE_DATAPLANE, fmt.Sprintf("server mode for deployment (%s or %s)", SERVERMODE_RESTAPI, SERVERMODE_DATAPLANE))
-	fs.StringVarP(&o.RestEndpoint, "rest-endpoint", "", "", "endpoint for REST API")
-	// default images
-	fs.StringVarP(&o.Kubedyndns, "kubednydns", "", "mandelsoft:coredns:latest", "image for dns server using dataplane access")
-	fs.StringVarP(&o.Restdyndns, "restdnydns", "", "mandelsoft:restdnyndns-coredns:latest", "image for dns server using REST API access")
 }
 
 func (o *Options) Configure(ctx context.Context, cfg *manager.Options, opts flagutils.OptionSet) error {

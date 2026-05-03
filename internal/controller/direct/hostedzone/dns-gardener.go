@@ -6,30 +6,58 @@ import (
 	"net"
 	"strings"
 
+	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const DNSMODE_GARDENER = "gardener"
+
 func init() {
-	DNSModes.Register("gardener", DNSModeFactory(NewDNSByGardener))
+	DNSModes.Register(DNSMODE_GARDENER, NewGardenerDNSModeFactory())
 }
+
+var (
+	_ flagutils.OptionSet = (*gardenerDNSModeFactory)(nil)
+)
+
+type gardenerDNSModeFactory struct {
+	flagutils.DefaultOptionSet
+	class  *flagutils.OptionsRef[*DNSClassOption]
+	domain *flagutils.OptionsRef[*DNSDomainOption]
+}
+
+func NewGardenerDNSModeFactory() DNSModeFactory {
+	f := &gardenerDNSModeFactory{
+		class:  flagutils.NewDefaultOptionsRef[*DNSClassOption](),
+		domain: flagutils.NewDefaultOptionsRef[*DNSDomainOption](),
+	}
+	f.Add(f.class, f.domain)
+	return f
+}
+
+func (s *gardenerDNSModeFactory) Description() string {
+	return "Gardener DNS record provisioning"
+}
+
+func (s *gardenerDNSModeFactory) Create(ctx context.Context, cfg *Options) (DNSMode, error) {
+	class := s.class.Options.class
+	if class == "" {
+		class = "garden"
+	}
+	if s.domain.Options.domain == "" {
+		return nil, fmt.Errorf("DNS domain required")
+	}
+	return &dnsGardener{DNSDummy: DNSDummy{DNSMODE_GARDENER}, domain: s.domain.Options.domain, class: class}, nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 type dnsGardener struct {
 	DNSDummy
 	domain string
 	class  string
-}
-
-func NewDNSByGardener(ctx context.Context, opts *Options) (DNSHandler, error) {
-	class := opts.DNSClass
-	if class == "" {
-		class = "garden"
-	}
-	if opts.DNSDomain == "" {
-		return nil, fmt.Errorf("DNS domain required")
-	}
-	return &dnsGardener{domain: opts.DNSDomain, class: class}, nil
 }
 
 func (d *dnsGardener) Modify(ctx *DNSContext, obj client.Object) error {

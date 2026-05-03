@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/mandelsoft/goutils/funcs"
 	"github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 	"github.com/mandelsoft/kubedns/pkg/render"
 	"github.com/mandelsoft/logging"
@@ -75,28 +74,24 @@ func TestRenderManifests(logger logging.Logger) error {
 	ctx.Simulate = true
 
 	r := &HostedZoneReconciler{
-		Options: &Options{
-			RestEndpoint: "http:/localhost:8085",
-			Kubedyndns:   "kubedyndns:latest",
-			Restdyndns:   "restdyndns:latest",
-		},
+		Options: NewOptions(),
 	}
 
-	err = handleCombi(ctx, "local", manifests, r, NewDataplaneServer, NewLocalMode)
+	err = handleCombi(ctx, "local", manifests, r, SERVERMODE_DATAPLANE, NewLocalMode)
 	if err != nil {
 		return err
 	}
-	err = handleCombi(ctx, "runtime server", manifests, r, NewRestAPIServer, NewRuntimeMode)
+	err = handleCombi(ctx, "runtime server", manifests, r, SERVERMODE_RESTAPI, NewRuntimeMode)
 	if err != nil {
 		return err
 	}
 	r.Options.RuntimeNamespace = ""
-	err = handleCombi(ctx, "runtime", manifests, r, NewDataplaneServer, NewRuntimeMode)
+	err = handleCombi(ctx, "runtime", manifests, r, SERVERMODE_DATAPLANE, NewRuntimeMode)
 	if err != nil {
 		return err
 	}
 	r.Options.RuntimeNamespace = "dns-namespace"
-	err = handleCombi(ctx, "runtime namespace", manifests, r, NewDataplaneServer, NewRuntimeMode)
+	err = handleCombi(ctx, "runtime namespace", manifests, r, SERVERMODE_DATAPLANE, NewRuntimeMode)
 	if err != nil {
 		return err
 	}
@@ -104,8 +99,12 @@ func TestRenderManifests(logger logging.Logger) error {
 	return nil
 }
 
-func handleCombi(ctx ReconcileContext, name string, manifests map[string][]byte, r *HostedZoneReconciler, s ServerModeFactory, m ModeFactory) error {
-	r.ServerMode = funcs.Must(s(nil, r.Options))
+func handleCombi(ctx ReconcileContext, name string, manifests map[string][]byte, r *HostedZoneReconciler, s string, m ModeFactory) error {
+	var err error
+	r.ServerMode, err = ServerModes.Create(ctx, s, r.Options)
+	if err != nil {
+		return err
+	}
 	r.Mode = m(r)
 	values, err := ctx.Values(r.Mode, false)
 	if err != nil {
