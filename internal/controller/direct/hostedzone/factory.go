@@ -60,8 +60,8 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 	r.Info("for Class '{{class}}'", "class", r.Options.Class)
 	r.Info("for Runtime '{{runtime}}'", "runtime", r.Options.Runtime)
 	r.Info("for Platform mode '{{platform}}'", "platform", r.Options.Platform)
-	r.Info("using FieldManger '{{fieldmanager}}'", "fieldmanager", r.FieldManager)
 	r.Info("using Finalizer '{{finalizer}}'", "finalizer", r.Finalizer)
+	r.Info("using FieldManger '{{fieldmanager}}'", "fieldmanager", r.FieldManager)
 	r.Info("using DNS mode '{{mode}}'", "mode", r.Options.DNSMode.GetName())
 	r.Info("using Nameserver mode '{{mode}}'", "mode", r.Options.ServerMode.GetName())
 
@@ -86,11 +86,6 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 	}
 
 	if err := r.Mode.Validate(); err != nil {
-		return nil, err
-	}
-
-	r.ServerMode, err = ServerModes.Create(nil, SERVERMODE_DATAPLANE, r.Options)
-	if err != nil {
 		return nil, err
 	}
 

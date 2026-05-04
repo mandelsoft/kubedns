@@ -8,8 +8,8 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: manager-dataplane
+  name: kubedns-dataplane
 subjects:
 - kind: ServiceAccount
-  name: controller-manager
+  name: kubedns
   namespace: system

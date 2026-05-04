@@ -10,7 +10,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/mandelsoft/flagutils v0.0.0-20260501194609-8a50fcdc8aa7
 	github.com/mandelsoft/goutils v0.0.0-20260419151859-e28bee9b7032
-	github.com/mandelsoft/kubecrtutils v0.0.0-20260503123820-cca22d376086
+	github.com/mandelsoft/kubecrtutils v0.0.0-20260504145827-de2ccaca175e
 	github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4
 	github.com/mandelsoft/spiff v1.3.0-beta-7.0.20251217160149-636218617943
 	github.com/miekg/dns v1.1.72
@@ -131,7 +131,7 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 )
 
-//replace github.com/mandelsoft/kubecrtutils => ../kubecrtutils
+// replace github.com/mandelsoft/kubecrtutils => ../kubecrtutils
 
 //replace github.com/kcp-dev/multicluster-provider => ../../../github.com/kcp-dev/multicluster-provider
 replace github.com/kcp-dev/multicluster-provider => github.com/mandelsoft/multicluster-provider v0.0.0-20260304155307-cdb2c159df23

@@ -59,6 +59,7 @@ spec:
         - --kubeconfig-identity=demo
         - --controllers=server
         - --dnsapi=:80
+        - --slave-mode=true
         image: mandelsoft/kubedns:latest
         imagePullPolicy: Always
         name: dns-container

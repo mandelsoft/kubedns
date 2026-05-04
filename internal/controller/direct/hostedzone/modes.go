@@ -34,7 +34,7 @@ func (m *ModeImpl) Validate() error {
 }
 
 func (m *ModeImpl) ServerMode() ServerMode {
-	return m.HostedZoneReconciler.ServerMode
+	return m.HostedZoneReconciler.Options.ServerMode
 }
 
 func (m *ModeImpl) Cleanup(ctx ReconcileContext, name string) reconcile.Problem {

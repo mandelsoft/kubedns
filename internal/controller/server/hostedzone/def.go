@@ -15,6 +15,7 @@ import (
 	"github.com/mandelsoft/kubedns/internal/controller/server/servercomp"
 	"github.com/mandelsoft/kubedns/internal/controller/server/zonemodel"
 	"github.com/mandelsoft/logging"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -55,7 +56,11 @@ func (f *Factory) CreateSettings(ctx context.Context, o *server.Options, control
 }
 
 func (f *Factory) CreateRequest(r *reconciler.BaseRequest[*corednsv1alpha1.HostedZone], r2 *factories.Reconciler[*server.Options, *Settings, *corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone]) reconciler.ReconcileRequest[*corednsv1alpha1.HostedZone] {
-	return &Request{r, r2.Settings, r2.Options.IsMaster(r.Object.Status.Conditions)}
+	var cond []v1.Condition
+	if r.Object != nil {
+		cond = r.Object.Status.Conditions
+	}
+	return &Request{r, r2.Settings, r2.Options.IsMaster(cond)}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

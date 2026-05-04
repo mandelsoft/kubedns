@@ -95,8 +95,12 @@ func Values(c ReconcileContext, m Mode, deleting bool) (map[string]interface{}, 
 	if err != nil {
 		return nil, err
 	}
+	apex := []any{}
+	if c.GetObject() != nil {
+		apex = sliceutils.Convert[any](c.GetObject().Spec.DomainNames)
+	}
 	values := map[string]interface{}{
-		"apex": sliceutils.Convert[any](c.GetObject().Spec.DomainNames),
+		"apex": apex,
 		"dataplane": map[string]interface{}{
 			"namespace": key.Namespace,
 			"server":    u.String(),

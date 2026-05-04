@@ -1,0 +1,25 @@
+[controller-manager] "Observed a panic" controller=server.corednsentry controllerGroup=coredns.mandelsoft.org controllerKind=CoreDNSEntry panic="technical cluster \"1fhyywfw31te2v9c\" does not match logical fleet \"source\"[default]" panicGoValue="&errors.errorString{s:\"technical cluster \\\"1fhyywfw31te2v9c\\\" does not match logical fleet \\\"source\\\"[default]\"}" reconcileID=b0488a7b-b58f-4bc2-9600-57f30dac0389 stacktrace="goroutine 366 [running]:
+k8s.io/apimachinery/pkg/util/runtime.logPanic({0x2975a80, 0xc000872120}, {0x21959c0, 0xc0000605f0})
+\t/go/pkg/mod/k8s.io/apimachinery@v0.35.0/pkg/util/runtime/runtime.go:132 +0xbc
+sigs.k8s.io/controller-runtime/pkg/internal/controller.(*Controller[...]).Reconcile.func1()
+\t/go/pkg/mod/sigs.k8s.io/controller-runtime@v0.23.1/pkg/internal/controller/controller.go:202 +0x10e
+panic({0x21959c0?, 0xc0000605f0?})
+\t/usr/local/go/src/runtime/panic.go:783 +0x132
+github.com/mandelsoft/kubecrtutils/cluster/fleet.(*_fleetAlias).LiftTechnical(0xc0006dbe90, {0xc000475dd8, 0x10})
+\t/go/pkg/mod/github.com/mandelsoft/kubecrtutils@v0.0.0-20260503123820-cca22d376086/cluster/fleet/alias.go:78 +0x21d
+github.com/mandelsoft/kubecrtutils/controller.(*reconcileWrapper[...]).Reconcile(0x0, {0x2975a80?, 0xc000872120}, {{{{0xc000918de0, 0x4}, {0xc000918ddc, 0x4}}}, {0xc000475dd8, 0x10}})
+\t/go/pkg/mod/github.com/mandelsoft/kubecrtutils@v0.0.0-20260503123820-cca22d376086/controller/controller.go:242 +0x42
+sigs.k8s.io/multicluster-runtime/pkg/reconcile.(*ClusterNotFoundWrapper[...]).Reconcile(0x7fe1c418ce60?, {0x2975a80?, 0xc000872120?}, {{{{0xc000918de0, 0x4}, {0xc000918ddc, 0x4}}}, {0xc000475dd8, 0x10}})
+\t/go/pkg/mod/sigs.k8s.io/multicluster-runtime@v0.23.1/pkg/reconcile/wrapper.go:41 +0x68
+sigs.k8s.io/controller-runtime/pkg/internal/controller.(*Controller[...]).Reconcile(0x0, {0x2975a80?, 0xc000872120}, {{{{0xc000918de0, 0x4}, {0xc000918ddc, 0x4}}}, {0xc000475dd8, 0x10}})
+\t/go/pkg/mod/sigs.k8s.io/controller-runtime@v0.23.1/pkg/internal/controller/controller.go:222 +0x184
+sigs.k8s.io/controller-runtime/pkg/internal/controller.(*Controller[...]).reconcileHandler(0x29a9a00, {0x2975ab8, 0xc000315e50}, {{{{0xc000918de0, 0x4}, {0xc000918ddc, 0x4}}}, {0xc000475dd8, 0x10}}, 0x0)
+\t/go/pkg/mod/sigs.k8s.io/controller-runtime@v0.23.1/pkg/internal/controller/controller.go:479 +0x38c
+sigs.k8s.io/controller-runtime/pkg/internal/controller.(*Controller[...]).processNextWorkItem(0x29a9a00, {0x2975ab8, 0xc000315e50})
+\t/go/pkg/mod/sigs.k8s.io/controller-runtime@v0.23.1/pkg/internal/controller/controller.go:438 +0x2be
+sigs.k8s.io/controller-runtime/pkg/internal/controller.(*Controller[...]).Start.func1.1()
+\t/go/pkg/mod/sigs.k8s.io/controller-runtime@v0.23.1/pkg/internal/controller/controller.go:313 +0x85
+created by sigs.k8s.io/controller-runtime/pkg/internal/controller.(*Controller[...]).Start.func1 in goroutine 348
+\t/go/pkg/mod/sigs.k8s.io/controller-runtime@v0.23.1/pkg/internal/controller/controller.go:309 +0x26b
+"
+

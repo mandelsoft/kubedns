@@ -36,7 +36,7 @@ func (d DNSDummy) GetName() string {
 }
 
 func (DNSDummy) Manifests(ctx *DNSContext, values map[string]interface{}) (*render.Rendered, reconcile.Problem) {
-	return nil, nil
+	return &render.Rendered{}, nil
 }
 func (DNSDummy) Modify(ctx *DNSContext, obj client.Object) error {
 	return nil

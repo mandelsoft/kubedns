@@ -72,8 +72,8 @@ func main() {
 	def := ctrlmgmt.Define(corednsv1alpha1.GroupVersion.Group, cluster.DEFAULT, "runtime", "target", "dataplane", "source").
 		WithScheme(scheme).
 		AddCluster(
-			cluster.Define("runtime", "runtime cluster").WithFallback("dataplane"),
-			cluster.DefineFleet("dataplane", "api cluster for functional controllers", kcp.Type()).WithFallback("target"),
+			cluster.Define("runtime", "runtime cluster").WithFallback("target"),
+			cluster.DefineFleet("dataplane", "api cluster for functional controllers", kcp.Type()).WithFallback("runtime"),
 			cluster.DefineFleet("source", "user api cluster", kcp.Type()).WithFallback("target"),
 			cluster.Define("target", "replication target").WithFallback(cluster.DEFAULT),
 			cluster.DefineFleet(cluster.DEFAULT, "default cluster as fallback for target", kcp.Type()),

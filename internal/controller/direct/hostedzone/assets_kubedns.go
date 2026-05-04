@@ -58,7 +58,7 @@ func TestRenderKubeDNSManifests(logger logging.Logger) error {
 	r := &HostedZoneReconciler{
 		Options: NewOptions(),
 	}
-	r.ServerMode = funcs.Must(ServerModes.Create(nil, SERVERMODE_DATAPLANE, r.Options))
+	r.Options.ServerMode = funcs.Must(ServerModes.Create(nil, SERVERMODE_DATAPLANE, r.Options))
 	r.Mode = NewLocalMode(r)
 	values, err := ctx.Values(r.Mode, false)
 	if err != nil {
@@ -74,7 +74,7 @@ func TestRenderKubeDNSManifests(logger logging.Logger) error {
 	}
 
 	r.Options.RuntimeNamespace = ""
-	r.ServerMode = funcs.Must(ServerModes.Create(nil, SERVERMODE_DATAPLANE, r.Options))
+	r.Options.ServerMode = funcs.Must(ServerModes.Create(nil, SERVERMODE_DATAPLANE, r.Options))
 	r.Mode = NewRuntimeMode(r)
 	values, err = ctx.Values(r.Mode, false)
 	if err != nil {
@@ -90,7 +90,7 @@ func TestRenderKubeDNSManifests(logger logging.Logger) error {
 	}
 
 	r.Options.RuntimeNamespace = "dns-runtime"
-	r.ServerMode = funcs.Must(ServerModes.Create(nil, SERVERMODE_DATAPLANE, r.Options))
+	r.Options.ServerMode = funcs.Must(ServerModes.Create(nil, SERVERMODE_DATAPLANE, r.Options))
 	r.Mode = NewRuntimeMode(r)
 	values, err = ctx.Values(r.Mode, false)
 	if err != nil {

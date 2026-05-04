@@ -35,9 +35,8 @@ import (
 // HostedZoneReconciler reconciles a HostedZone object
 type HostedZoneReconciler struct {
 	*common2.Reconciler
-	Mode       Mode
-	ServerMode ServerMode
-	Finalizer  string
+	Mode      Mode
+	Finalizer string
 
 	Manifests map[string][]byte
 

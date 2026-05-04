@@ -101,7 +101,7 @@ func TestRenderManifests(logger logging.Logger) error {
 
 func handleCombi(ctx ReconcileContext, name string, manifests map[string][]byte, r *HostedZoneReconciler, s string, m ModeFactory) error {
 	var err error
-	r.ServerMode, err = ServerModes.Create(ctx, s, r.Options)
+	r.Options.ServerMode, err = ServerModes.Create(ctx, s, r.Options)
 	if err != nil {
 		return err
 	}
