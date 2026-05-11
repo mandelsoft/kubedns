@@ -9,8 +9,8 @@ require (
 	github.com/kcp-dev/sdk v0.30.0
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/mandelsoft/flagutils v0.0.0-20260501194609-8a50fcdc8aa7
-	github.com/mandelsoft/goutils v0.0.0-20260419151859-e28bee9b7032
-	github.com/mandelsoft/kubecrtutils v0.0.0-20260504145827-de2ccaca175e
+	github.com/mandelsoft/goutils v0.0.0-20260507153918-c39bb4bb4b7b
+	github.com/mandelsoft/kubecrtutils v0.0.0-20260511145839-86c22588f3ea
 	github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4
 	github.com/mandelsoft/spiff v1.3.0-beta-7.0.20251217160149-636218617943
 	github.com/miekg/dns v1.1.72
@@ -37,6 +37,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/drone/envsubst v1.0.3 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
+	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
@@ -75,6 +76,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -131,7 +133,7 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 )
 
-// replace github.com/mandelsoft/kubecrtutils => ../kubecrtutils
+//replace github.com/mandelsoft/kubecrtutils => ../kubecrtutils
 
 //replace github.com/kcp-dev/multicluster-provider => ../../../github.com/kcp-dev/multicluster-provider
 replace github.com/kcp-dev/multicluster-provider => github.com/mandelsoft/multicluster-provider v0.0.0-20260304155307-cdb2c159df23

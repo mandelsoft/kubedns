@@ -14,6 +14,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/ctrlmgmt"
 	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/options/activationopts"
+	"github.com/mandelsoft/kubecrtutils/options/healthzopts"
 	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
 	"github.com/mandelsoft/kubecrtutils/options/mlogopts"
 	"github.com/mandelsoft/kubecrtutils/options/workeropts"
@@ -100,6 +101,7 @@ func main() {
 
 	options.Add(
 		metricsopts.New(),    // options to control the manager metrics service
+		healthzopts.New(),    // options to configure readiness and livenaess probe
 		mlogopts.New(true),   // options to control mandelsoft/logging
 		activationopts.New(), // enable controller selection
 		workeropts.New(),     // enable work queue configuration

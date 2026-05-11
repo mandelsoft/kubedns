@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	yaml2 "github.com/goccy/go-yaml"
-	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/spiff/spiffing"
 	"github.com/mandelsoft/spiff/yaml"
 )
@@ -93,8 +92,57 @@ func Render(manifests map[string][]byte, values map[string]interface{}, key ...s
 	return rendered, nil
 }
 
+func apply_to_annotations(path string, data any, f func(string, map[string]any) bool) bool {
+	mod := false
+	switch v := data.(type) {
+	case map[string]any:
+		for k, a := range v {
+			if k == "annotations" {
+				if m, ok := a.(map[string]any); ok {
+					if f(path+".annotations", m) {
+						mod = true
+					}
+				}
+			} else {
+				if apply_to_annotations(path+"."+k, a, f) {
+					mod = true
+				}
+			}
+		}
+	case []any:
+		for i, a := range v {
+			if apply_to_annotations(fmt.Sprintf("%s[%d]", path, i), a, f) {
+				mod = true
+			}
+		}
+	}
+	return mod
+}
+
 func apply_hashes(manifests map[string][]byte) error {
 	mod := true
+
+	f := func(p string, annos map[string]any) bool {
+		changed := false
+		for k, cur := range annos {
+			if strings.HasPrefix(k, "hashes.") {
+				key := k[len("hashes."):]
+				data := manifests[key]
+				if len(data) > 0 {
+					h := sha256.Sum256(data)
+					n := hex.EncodeToString(h[:])
+					if n != cur {
+						changed = true
+						annos[k] = n
+					}
+				} else {
+					changed = true
+					delete(annos, k)
+				}
+			}
+		}
+		return changed
+	}
 
 	for mod {
 		mod = false
@@ -106,34 +154,13 @@ func apply_hashes(manifests map[string][]byte) error {
 				return err
 			}
 
-			meta := generics.Cast[map[string]interface{}](m["metadata"])
-			if meta != nil {
-				annos := generics.Cast[map[string]interface{}](meta["annotations"])
-				changed := false
-				for k, cur := range annos {
-					if strings.HasPrefix(k, "hashes.") {
-						data := manifests[k[len("hashes."):]]
-						if len(data) > 0 {
-							h := sha256.Sum256(data)
-							n := hex.EncodeToString(h[:])
-							if n != cur {
-								changed = true
-								annos[k] = n
-							}
-						} else {
-							changed = true
-							delete(annos, k)
-						}
-					}
+			if apply_to_annotations(n, m, f) {
+				mod = true
+				v, err := yaml2.Marshal(m)
+				if err != nil {
+					return err
 				}
-				if changed {
-					mod = true
-					v, err := yaml2.Marshal(m)
-					if err != nil {
-						return err
-					}
-					manifests[n] = v
-				}
+				manifests[n] = v
 			}
 		}
 	}

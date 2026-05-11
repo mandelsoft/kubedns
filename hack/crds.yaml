@@ -1,0 +1,7 @@
+values:
+  gen: ../gen/kcp
+  crds:
+  - file: ../config/crd/bases/coredns.mandelsoft.org_corednsentries.yaml
+    version: v1alpha1
+  - file: ../config/crd/bases/coredns.mandelsoft.org_hostedzones.yaml
+    version: v1alpha1

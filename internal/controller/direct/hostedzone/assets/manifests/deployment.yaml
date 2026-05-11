@@ -38,6 +38,9 @@ spec:
     metadata:
       labels:
         app: (( values.runtime.label ))
+      annotations:
+        hashes.secret.yaml: (( optional( values.runtime.secret.name == "", "use") ))
+        hashes.config.yaml: use
     spec:
       automountServiceAccountToken: (( values.dataplane.access.serviceaccount != "" || false ))
       serviceAccountName: (( values.dataplane.access.serviceaccount || ~~ ))

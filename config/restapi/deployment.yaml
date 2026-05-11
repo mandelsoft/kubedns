@@ -24,7 +24,7 @@ spec:
     - name: api
       protocol: TCP
       port: 80         # The port the Service exposes
-      targetPort: 80    # The containerPort defined in the Deployment
+      targetPort: api    # The containerPort defined in the Deployment
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -58,13 +58,13 @@ spec:
         - --kubeconfig-endpointslice=coredns.mandelsoft.org  # required for KCP
         - --kubeconfig-identity=demo
         - --controllers=server
-        - --dnsapi=:80
+        - --dnsapi=:8085
         - --slave-mode=true
         image: mandelsoft/kubedns:latest
         imagePullPolicy: Always
         name: dns-container
         ports:
-        - containerPort: 80
+        - containerPort: 8085
           name: api
           protocol: TCP
         volumeMounts:

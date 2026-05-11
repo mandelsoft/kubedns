@@ -44,7 +44,7 @@ func Responsibility(c controller.TypedController[*corednsv1alpha1.HostedZone, co
 		unresponsible: map[mcreconcile.Request]bool{},
 		ParentIndex:   pidx,
 		EntryIndex:    eidx,
-		Source:        c.GetCluster(),
+		Source:        c.GetMainCluster(),
 	}, nil
 }
 

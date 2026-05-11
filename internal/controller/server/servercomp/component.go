@@ -32,9 +32,9 @@ type Component struct {
 }
 
 var (
-	_ manager.Runnable                  = (*Component)(nil)
-	_ component.ComponentImplementation = (*Component)(nil)
-	_ zonemodel.Index                   = (*Component)(nil)
+	_ manager.Runnable         = (*Component)(nil)
+	_ component.Implementation = (*Component)(nil)
+	_ zonemodel.Index          = (*Component)(nil)
 )
 
 func (c *Component) GetComponent() component.Component {

@@ -118,7 +118,7 @@ spec:
                   type: string
                 type: array
               TTL:
-                type: int
+                type: integer
               dnsNames:
                 description: DNSNames is a list of DNSNames
                 items:

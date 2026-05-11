@@ -3,6 +3,7 @@ package hostedzone
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/spf13/pflag"
@@ -27,8 +28,8 @@ type restapiServerFactory struct {
 
 func NewRestAPIServerFactory() ServerModeFactory {
 	return &restapiServerFactory{
-		*newServerFactorySupport(SERVERMODE_RESTAPI, "mandelsoft/restdnyndns-coredns:latest", "primary DNS server accessing REST API"),
-		"http://dns-rest-api.dns-service.svc.cluster.local",
+		*newServerFactorySupport(SERVERMODE_RESTAPI, "mandelsoft/restdyndns-coredns:latest", "primary DNS server accessing REST API"),
+		"http://dns-service-restserver.dns-system.svc.cluster.local",
 	}
 }
 
@@ -45,7 +46,15 @@ func (f *restapiServerFactory) Create(ctx context.Context, cfg *Options) (Server
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", f.name, err)
 	}
-	return &restapiServer{*b, f.endpoint}, nil
+
+	u, err := url.Parse(f.endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", f.name, err)
+	}
+	if u.Scheme == "" {
+		u.Scheme = "http"
+	}
+	return &restapiServer{*b, u.String()}, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////

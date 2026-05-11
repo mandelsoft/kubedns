@@ -5,9 +5,12 @@ corefile: |
     ready
     cache 30
     restdyndns (( join(" ", values.apex) )) {
-      zonepath (( values.dataplane.cluster "/" values.dataplane.namespace "/" values.dataplane.zone ))
-      endpoint (( values.runtime.restendpoint ))
+      zonepath "(( values.dataplane.cluster "/" values.dataplane.namespace "/" values.dataplane.zone ))"
+      endpoint "(( values.runtime.restendpoint ))"
       transitive
       ttl 30
+    }
+    template ANY ANY . {
+        rcode NXDOMAIN
     }
   }

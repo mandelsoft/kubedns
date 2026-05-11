@@ -60,6 +60,6 @@ func CreateReconciler(ctx context.Context, controller controller.TypedController
 		Reconciler: base,
 		Options:    &d.GetOptions().(*hostedzone2.ReconcilerFactory).Options,
 	}
-	r.Info("using dataplane cluster", "apiserver", controller.GetCluster().GetInfo())
+	r.Info("using dataplane cluster", "apiserver", controller.GetMainCluster().GetInfo())
 	return reconciler.CRTReconcilerFor[*corednsv1alpha1.CoreDNSEntry](controller, r, 0), nil
 }

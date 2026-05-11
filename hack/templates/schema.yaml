@@ -1,0 +1,20 @@
+---
+schemas: (( map[values.crds|spec|->helper.generate(spec.version, read(__ctx.DIR "/" spec.file, "import"))] ))
+
+helper:
+  <<<: (( &temporary ))
+
+  generate: (( |v,crd|-> write(values.gen "/" crd.spec.group "_" crd.spec.names.plural ".yaml", *_.template) ))
+  mapVersion: (( |e|-> sum[e|{}|s,k,v|-> s { k = (k == "schema" ? (v["openAPIV3Schema"] || v) :v)}] ))
+  template:
+    <<<: (( &template ))
+    apiVersion: apis.kcp.io/v1alpha1
+    kind: APIResourceSchema
+    metadata:
+      name: (( v "." crd.metadata.name ))
+    spec:
+      group: (( crd.spec.group ))
+      names: (( crd.spec.names ))
+      scope: (( crd.spec.scope ))
+      versions: (( map[crd.spec.versions|e|->_.mapVersion(e)] ))
+

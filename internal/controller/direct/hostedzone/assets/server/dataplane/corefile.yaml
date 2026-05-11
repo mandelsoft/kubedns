@@ -14,4 +14,7 @@ corefile: |
       (( (values.runtime.secret.name != "" ) ? "token /etc/coredns/access/token /etc/coredns/access/ca.crt" :"" ))
       ttl 30
     }
+    template ANY ANY . {
+        rcode NXDOMAIN
+    }
   }

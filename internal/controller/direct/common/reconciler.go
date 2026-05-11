@@ -33,7 +33,7 @@ func NewReconciler(c controller.Controller) (*Reconciler, error) {
 	return &Reconciler{
 		Logger:       c.GetLogger(),
 		FieldManager: c.GetFieldManager(),
-		Dataplane:    c.GetCluster(),
+		Dataplane:    c.GetMainCluster(),
 		ParentIndex:  pidx,
 		EntryIndex:   eidx,
 	}, nil

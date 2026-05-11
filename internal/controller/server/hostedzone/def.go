@@ -49,7 +49,7 @@ func (f *Factory) CreateSettings(ctx context.Context, o *server.Options, control
 	return &Settings{
 		model:             controller.GetComponents().Get(server.Component).GetImplementation().(*servercomp.Component).GetModel(),
 		Options:           o,
-		ClusterEquivalent: controller.GetCluster(),
+		ClusterEquivalent: controller.GetMainCluster(),
 		EntryIndex:        cacheindex.GetTypedIndex[corednsv1alpha1.CoreDNSEntry](controller.GetIndices(), common.IndexKeyEntryZone),
 		ParentIndex:       cacheindex.GetTypedIndex[corednsv1alpha1.HostedZone](controller.GetIndices(), common.IndexKeyZoneParent),
 	}, nil

@@ -35,14 +35,14 @@ func (f *Factory) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVarP(&f.port, "dnsapi", "", ":8085", "The port on which to run the DNS API server.")
 }
 
-func (f *Factory) CreateComponent(ctx context.Context, comp component.Component) (component.ComponentImplementation, error) {
+func (f *Factory) CreateComponent(ctx context.Context, comp component.Component) (component.Implementation, error) {
 	c := &Component{
-		Logger:      comp,
+		Logger:      comp.GetLogger(),
 		comp:        comp,
 		cluster:     comp.GetCluster(server.CLUSTER),
 		indexByName: cacheindex.GetTypedIndex[corednsv1alpha1.CoreDNSEntry](comp.GetIndices(), INDEX_ZONENAMES),
 		indexByIP:   cacheindex.GetTypedIndex[corednsv1alpha1.CoreDNSEntry](comp.GetIndices(), INDEX_ZONEIPS),
-		WebServer:   NewWebServer(f.port, comp),
+		WebServer:   NewWebServer(f.port, comp.GetLogger()),
 	}
 	c.model = zonemodel.New(c)
 	c.WebServer.AddEndpoint(PATH_ZONES, c.handleNames)

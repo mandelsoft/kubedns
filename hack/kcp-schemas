@@ -1,0 +1,5 @@
+#!/bin/bash
+
+DIR="$(dirname -- "${BASH_SOURCE[0]}")"
+cd "$DIR"
+spiff merge --bindings "crds.yaml" "../../hack/templates/schema.yaml"
