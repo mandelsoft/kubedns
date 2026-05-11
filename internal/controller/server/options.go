@@ -31,14 +31,15 @@ func (o *Options) IsMaster(conditions []metav1.Condition) bool {
 	// This means the controller is explictly managed and not by an aaS controller
 	// managing additional conditions
 	if !o.Slave {
-		return true
-	}
-	plain := true
-	for _, c := range conditions {
-		if c.Type != corednsv1alpha1.ServerConditionType {
-			plain = false
-			break
+		plain := true
+		for _, c := range conditions {
+			if c.Type != corednsv1alpha1.ServerConditionType {
+				return false
+				break
+			}
 		}
+		return plain
 	}
-	return plain
+	return false
+
 }

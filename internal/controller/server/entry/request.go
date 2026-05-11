@@ -89,6 +89,7 @@ func (r *Request) ReconcileDeleted() reconcile.Problem {
 }
 
 func (r *Request) updateStatus(force bool, zn string, names []string, err error) reconcile.Problem {
+	r.Info("update status for slave={{slave}}", "slave", !r.master)
 	o := r.Object
 	if o.Status.RootZone != zn {
 		o.Status.RootZone = zn

@@ -85,6 +85,7 @@ func (r *Request) TriggerStatusChanged() {
 }
 
 func (r *Request) updateStatus(force bool, err error, oreason ...string) reconcile.Problem {
+	r.Info("update status for slave={{slave}}", "slave", !r.master)
 	o := r.Object
 	if r.master {
 		if len(o.Status.Conditions) > 0 {
